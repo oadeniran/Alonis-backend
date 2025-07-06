@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from config import appENV
+from config import appENV, PORT
 from routes import assessmentRoutes, talkRoutes, userActionsRoutes  # Import routes
 
 
@@ -44,4 +44,4 @@ app.include_router(userActionsRoutes.router, prefix=prefix + "/user-history", ta
 if __name__ == "__main__":
     import uvicorn
     reload = True  if appENV != "production" else False
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=reload)
+    uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=reload)
