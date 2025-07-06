@@ -5,7 +5,7 @@ from routes import assessmentRoutes, talkRoutes, userActionsRoutes  # Import rou
 
 
 ## Define API prefix based on environment
-prefix = "/" + ("mindwave" if appENV == "production" else "dev")
+prefix = "/" + ("mindwave" if appENV == "production"  else ("mindwave" if appENV == "development" else "dev"))
 
 ## Set API documentation details
 title = f"mindwave API for {appENV} Environment"
