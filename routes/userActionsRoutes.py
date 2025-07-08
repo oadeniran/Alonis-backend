@@ -1,9 +1,10 @@
 from fastapi import APIRouter
 from routesLogic import userActions
 router = APIRouter()
+from dtos.user_dto import UserDTO, UserLoginDTO
 
 @router.post("/sign-up")
-async def sign_up(user_name, password):
+async def sign_up(user_details: UserDTO):
     """
     Endpoint to sign up a new user.
     
@@ -13,10 +14,10 @@ async def sign_up(user_name, password):
     Returns:
         dict: A dictionary containing a success message or an error message.
     """
-    return userActions.signup_user(user_name, password)
+    return userActions.signup_user(user_details.model_dump())
 
 @router.post("/sign-in")
-async def sign_in(user_name, password):
+async def sign_in(login_cred: UserLoginDTO):
     """
     Endpoint to sign in an existing user.
     
@@ -27,7 +28,7 @@ async def sign_in(user_name, password):
     Returns:
         dict: A dictionary containing a success message or an error message.
     """
-    return userActions.login_user(username = user_name,password = password)
+    return userActions.login_user(login_cred.model_dump())
 
 @router.get("/get-all-sessions")
 async def get_all_sessions(uid: str):
