@@ -36,7 +36,11 @@ def signup(signUp_det):
 def login(login_det):
 
     try:
-        details = usersCollection.find_one({"username" : login_det["username"]})
+        if login_det["is_email_login"]:
+            details = usersCollection.find_one({"email" : login_det["email"]})
+        else:
+            # If not email login, use username
+            details = usersCollection.find_one({"username" : login_det["username"]})
     except:
         return {
                     "message" : "Error with DB",
@@ -49,7 +53,11 @@ def login(login_det):
             return {
                     "message" : "Sign In successful",
                     "status_code" : 200,
-                    "uid" : str(details["_id"])}
+                    "uid" : str(details["_id"]),
+                    "username" : details["username"],
+                    "email" : details["email"],
+                    "alonis_verbosity" : details["alonis_verbosity"],
+                    "short_bio" : details["short_bio"]}
         else:
             return {
             "message" : "Wrong Password",
