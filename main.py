@@ -5,16 +5,16 @@ from routes import assessmentRoutes, talkRoutes, userActionsRoutes, commonRoutes
 
 
 ## Define API prefix based on environment
-prefix = "/" + ("mindwave" if appENV == "production"  else ("mindwave" if appENV == "development" else "dev"))
+prefix = "/" + ("alonis" if appENV == "production"  else ("alonis" if appENV == "development" else "dev"))
 
 ## Set API documentation details
-title = f"mindwave API for {appENV} Environment"
-description = f"mindwave API for {appENV} Documentation"
+title = f"Alonis API for {appENV} Environment"
+description = f"Alonis API for {appENV} Documentation"
 
 tags_metadata = [
     {
-        "name": "MindWave APIs",
-        "description": "Endpoints to power mindwave",
+        "name": "Alonis APIs",
+        "description": "Endpoints to power alonis",
     }
 ]
 
