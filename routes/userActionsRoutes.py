@@ -15,7 +15,7 @@ async def sign_up(user_details: UserDTO):
     Returns:
         dict: A dictionary containing a success message or an error message.
     """
-    return userActions.signup_user(user_details.model_dump())
+    return await userActions.signup_user(user_details.model_dump())
 
 @router.post("/sign-in")
 async def sign_in(login_cred: UserLoginDTO):
@@ -29,7 +29,7 @@ async def sign_in(login_cred: UserLoginDTO):
     Returns:
         dict: A dictionary containing a success message or an error message.
     """
-    return userActions.login_user(login_cred.model_dump())
+    return await userActions.login_user(login_cred.model_dump())
 
 @router.get("/{uid}/sessions")
 async def get_user_sessions(uid: str):

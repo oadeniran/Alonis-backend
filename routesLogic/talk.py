@@ -15,7 +15,7 @@ async def mindwave_talk_session(uid: str, session_id: str, user_input: str = "")
     
     context_doc_list = talksSessions.get_context_doc_list(userActions.build_context_for_user(uid), session_id)
 
-    output = talksSessions.talkToMe(uid, session_id, user_input, OPENAI_API_KEY, context_doc_list=context_doc_list)
+    output = talksSessions.talkToMe(uid, session_id, user_input, context_doc_list=context_doc_list)
 
     utils.remove_embedded_data(session_id)
 

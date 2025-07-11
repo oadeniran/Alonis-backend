@@ -173,7 +173,7 @@ def get_user_reports(uid):
                     }
     if reports == None:
         return {}
-    reports_formatted = {report['session_id']: {"session_type": report['session_type'], "report_data": report['report'], "is_saved": report["saved"]} for report in reports}
+    reports_formatted = {report['session_id']: {"session_type": report['session_type'], "report_data": report['report']} for report in reports}
     #print(reports_formatted)
     return reports_formatted
 
@@ -209,8 +209,7 @@ def build_context_for_user(uid):
             "metadata": {
                 "source": "assessment_report",
                 "session_id": session_id,
-                "session_type": report_details["session_type"],
-                "is_saved": report_details["is_saved"]
+                "session_type": report_details["session_type"]
             }
         }
     
@@ -220,7 +219,7 @@ def build_context_for_user(uid):
         for note_or_goal in user_notes_and_goals:
             if note_or_goal.get("is_goal", False):
                 context[f'a goal_provided_by user'] = {
-                    "content": note_or_goal["title"] + " : " + note_or_goal["details"] + "\n" + ("Achieved" if note_or_goal.get("is_achieved", False) else "Not Achieved"),
+                    "content": note_or_goal["title"] + " : " + 'Created on' + note_or_goal['date'] + note_or_goal["details"] + "\n" + ("Achieved" if note_or_goal.get("is_achieved", False) else "Not Achieved"),
                     "metadata": {
                         "source": "user_goal",
                         "title": note_or_goal["title"],
@@ -249,7 +248,7 @@ def get_user_session_report(uid, session_id):
     if report == None:
         return {"message": "No report found for this session", "status_code": 404}
     
-    return {"report_data": report["report"], "session_type": report["session_type"], "is_saved": report["saved"], "status_code": 200}
+    return {"report_data": report["report"], "session_type": report["session_type"], "is_saved": report.get("saved", False), "status_code": 200}
 
 def add_note_or_goal_for_user(uid, note_details):
     if not uid or uid == "":

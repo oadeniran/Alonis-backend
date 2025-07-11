@@ -27,11 +27,14 @@ def save_session_embeddings(text, user_id, api_key):
     rag.create_update_embeddings_for_user(docs, api_key, user_id)
     return "saved"
 
-def create_retriever(api_key, context_docs):
-    return rag.create_retriever(api_key, context_docs)
+def create_retriever(context_docs):
+    return rag.create_retriever(context_docs)
 
-def load_model(retriever, api_key, uid, session_id):
-    return rag.load_model(api_key, retriever, get_chat_history_for_ai(uid, session_id))
+def load_retriever(uid):
+    return rag.load_user_retriever(uid)
+
+def load_model(retriever, uid, session_id):
+    return rag.load_model(retriever, get_chat_history_for_ai(uid, session_id))
 
 def letsTalk(message, model, uid, session_id):
     add_chat_to_db(uid, session_id, "user", message, {}, talks_session=True)
@@ -41,8 +44,12 @@ def letsTalk(message, model, uid, session_id):
     add_chat_to_db(uid, session_id, "system", answer, {}, talks_session=True)
     return answer
 
-def talkToMe(uid, session_id, message, api_key, context_doc_list):
-    retriever = create_retriever(api_key, context_doc_list)
-    model = load_model(retriever, api_key, uid, session_id)
+def talkToMe(uid, session_id, message, context_doc_list= None):
+    if context_doc_list is not None:
+        retriever = create_retriever(context_doc_list)
+    else:
+
+        retriever = load_retriever(uid)
+    model = load_model(retriever, uid, session_id)
     return letsTalk(message, model, uid, session_id)
     

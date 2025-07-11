@@ -1,8 +1,10 @@
-from core import userActions, chatActions
+from core import userActions, chatActions, background_tasks
 import utils
 from config import OPENAI_API_KEY
+import asyncio
+from datetime import datetime
 
-def signup_user(user_details: dict):
+async def signup_user(user_details: dict):
     username = user_details.get("username")
     password = user_details.get("password")
     if not username or not password:
@@ -11,14 +13,17 @@ def signup_user(user_details: dict):
     if not password or len(password) < 8:
         return {"error": "Password must be at least 8 characters long"}
     
+    user_details['signup_date'] = datetime.now()
     
     resp = userActions.signup(user_details)
     if resp["status_code"] == 200:
+        user_details['uid'] = resp.get("uid")
+        asyncio.create_task(background_tasks.init_user_embeddings(user_details))
         return resp
     else:        
         return {"error": resp["message"]}
 
-def login_user(login_cred):
+async def login_user(login_cred):
     username = login_cred.get("username")
     password = login_cred.get("password")
     email = login_cred.get("email", "")

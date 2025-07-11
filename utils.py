@@ -102,8 +102,6 @@ def add_report_to_db(uid, session_type, session_id:str, report:str):
         {"$set": {"has_report": True}}
     )
 
-
-
 def update_report_save_status(uid, session_id:str):
     reportsCollection.find_one_and_update({"uid":uid, "session_id":session_id}, {"$set": {"saved": True}})
 
