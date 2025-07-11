@@ -10,14 +10,21 @@ from db import ragEmbeddingsCollection,db
 
 ATLAS_VECTOR_SEARCH_INDEX_NAME = "langchain-index-vectorstores"
 
-def create_docs(reports, curr_session_id):
+def create_docs(context, curr_session_id):
     docs = []
-    if len(reports) == 0:
+    if len(context) == 0:
         return docs
-    for session_id, report_details in reports.items():
+    
+    if isinstance(context, str):
+        context = { "Text Context" : {"content": context, "metadata": {}} }
+    for title, context_details in context.get('context', {}).items():
+        print("Creating document for title:", title)
+        print("Context details:", context_details)
+        meta_data = context_details.get("metadata", {})
+        meta_data["curr_session_id"] = curr_session_id
         doc = Document(
-            page_content=report_details["report_data"],
-            metadata={"session_id": session_id, "session_type": report_details["session_type"], "current_session_id": curr_session_id}
+            page_content=title + "\n" + context_details["content"],
+            metadata=meta_data
         )
         docs.append(doc)
     return docs
@@ -50,8 +57,8 @@ def create_update_embeddings_for_user(docs, api_key, user_id):
     return "done"
 
 
-def create_retriever(api_key, reports_doc_list):
-    if len(reports_doc_list) == 0:
+def create_retriever(api_key, context_doc_list):
+    if len(context_doc_list) == 0:
         return MongoDBAtlasVectorSearch(
             collection=ragEmbeddingsCollection,
             embedding=OpenAIEmbeddings(api_key=api_key),
@@ -59,7 +66,7 @@ def create_retriever(api_key, reports_doc_list):
             relevance_score_fn="cosine"
         ).as_retriever()
     vstore = MongoDBAtlasVectorSearch.from_documents(
-    documents=reports_doc_list,
+    documents=context_doc_list,
     embedding=OpenAIEmbeddings(api_key=api_key, disallowed_special=()), 
     collection=ragEmbeddingsCollection, 
     index_name=ATLAS_VECTOR_SEARCH_INDEX_NAME

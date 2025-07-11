@@ -1,19 +1,32 @@
 from fastapi import APIRouter
 from routesLogic import talk
+from dtos.talk_dto import TalkDTO
 
 router = APIRouter()
 
 @router.post("/talk-session")
-async def talk_session_route(uid: str, session_id: str, user_input: str = ""):
+async def talk_session_route(talk_data: TalkDTO):
     """
     Endpoint to handle talk session requests.
     
     Args:
-        uid (str): User ID.
-        session_id (str): Session ID.
-        user_input (str): User input for the talk session.
-    
+        talk_data (TalkDTO): Data transfer object containing user_id, session_id, and user_input.
     Returns:
-        dict: A dictionary containing the response from the talk session.
+        JSON response from the talk session logic.
     """
+    uid = talk_data.user_id
+    session_id = talk_data.session_id
+    user_input = talk_data.user_input if talk_data.user_input else ""
     return await talk.mindwave_talk_session(uid, session_id, user_input)
+
+@router.get("/{uid}/personalized-quote")
+async def personalized_quote(uid: str):
+    """
+    Endpoint to retrieve a personalized quote for a user.
+    
+    Args:
+        uid (str): User ID.
+    Returns:
+        JSON response containing a personalized quote.
+    """
+    return await talk.get_personalized_quote(uid)

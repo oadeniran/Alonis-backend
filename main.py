@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from config import appENV, PORT
-from routes import assessmentRoutes, talkRoutes, userActionsRoutes  # Import routes
+from routes import assessmentRoutes, talkRoutes, userActionsRoutes, commonRoutes  # Import routes
 
 
 ## Define API prefix based on environment
@@ -40,6 +40,7 @@ app.add_middleware(
 app.include_router(assessmentRoutes.router, prefix=prefix + "/assessment", tags=["assessment"])
 app.include_router(talkRoutes.router, prefix=prefix + "/talk", tags=["talk"])
 app.include_router(userActionsRoutes.router, prefix=prefix + "/user", tags=["user-actions"])
+app.include_router(commonRoutes.router, prefix=prefix + "/common", tags=["common"])
 
 if __name__ == "__main__":
     import uvicorn

@@ -39,21 +39,22 @@ async def get_all_sessions(uid: str):
     if not uid or uid == "":
         return {"error": "Please sign up/login to continue"}
     
-    userSessions = userActions.get_all_user_sessions(uid)
-    if not userSessions:
-        return {"error": "No sessions found for this user"}
-    
-    return userSessions
+    resp = userActions.get_all_user_sessions(uid)
 
-async def get_session_chats(uid: str, session_id: str, rant: bool = False):
+    if resp["status_code"] != 200:
+        return {"error": resp["message"]}
+    
+    return resp
+
+async def get_user_session_chats(uid: str, session_id: str, is_talk_session: bool = False):
     if not uid or uid == "":
         return {"error": "Please sign up/login to continue"}
     
-    chats, count = chatActions.get_chat_from_db(uid=uid, session_id=session_id, rant=rant, getCount=True)
-    if count == 0:
+    chats, count = chatActions.get_chat_from_db(uid=uid, session_id=session_id, talks_session=is_talk_session, getCount=True)
+    if count and count == 0:
         return {"error": "No messages for this session yet"}
     
-    return {"chats": chats, "count": count}
+    return {"messages": chats, "count": count, 'status_code': 200}
 
 async def get_user_reports(uid: str):
     if not uid or uid == "":
@@ -64,3 +65,70 @@ async def get_user_reports(uid: str):
         return {"error": "No reports found for this user"}
     
     return all_reports
+
+async def get_user_session_report(uid: str, session_id: str):
+    if not uid or uid == "":
+        return {"error": "Please sign up/login to continue"}
+    
+    if not session_id or session_id == "":
+        return {"error": "Session ID is required"}
+    
+    report = userActions.get_user_session_report(uid, session_id)
+    if not report:
+        return {"error": "No report found for this session"}
+    
+    return report
+
+async def add_user_note_or_goal(uid: str, note_details: dict):
+    if not uid or uid == "":
+        return {"error": "Please sign up/login to continue"}
+    
+    if not note_details or not isinstance(note_details, dict):
+        return {"error": "Note details are required"}
+    
+    resp = userActions.add_note_or_goal_for_user(uid, note_details)
+
+    print(resp)
+    if resp.get("status_code", 200) == 200:
+        return resp
+    else:
+        return {"error": resp["message"]}
+    
+async def get_user_notes_and_goals(uid):
+    if not uid or uid == "":
+        return {"error": "Please sign up/login to continue"}
+    
+    notes_and_goals = userActions.get_user_notes_and_goals(uid)
+
+    if not notes_and_goals:
+        return {"error": "No notes or goals found for this user"}
+    
+    return {"notes_and_goals": notes_and_goals, "status_code": 200}
+
+async def delete_note_or_goal(uid, note_id):
+    if not uid or uid == "":
+        return {"error": "Please sign up/login to continue"}
+    
+    if not note_id or note_id == "":
+        return {"error": "Note ID is required"}
+    
+    resp = userActions.delete_note_or_goal(uid, note_id)
+
+    if resp["status_code"] != 200:
+        return {"error": resp["message"]}
+    
+    return resp
+
+async def mark_goal_as_achieved(uid: str, note_id: str):
+    if not uid or uid == "":
+        return {"error": "Please sign up/login to continue"}
+    
+    if not note_id or note_id == "":
+        return {"error": "Note ID is required"}
+    
+    try:
+        result = userActions.mark_goal_as_achieved(uid, note_id)
+        return result   
+    except Exception as e:
+        print(e)
+        return {"error": "Error marking note as achieved", "status_code": 400}

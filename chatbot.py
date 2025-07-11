@@ -21,9 +21,9 @@ def get_todays_date_formatted():
 LLM = ChatOpenAI(api_key=OPENAI_API_KEY, model_name="gpt-4o-mini", temperature=0.0)
 
 def get_chat_history_for_ai(uid, session_id):
-    chat_history = get_chat_from_db(uid, session_id)
+    chat_history, count = get_chat_from_db(uid, session_id)
     new_messages = []
-    if not chat_history:
+    if not chat_history or count == 0:
         return new_messages
     else:
         for message in chat_history:
@@ -113,11 +113,11 @@ def MindWavebot(uid, session_id:str, message:str, system_template, verbosity=1):
 
         print("Extracted dictionary:", dictionary_response)
         
-        add_chat_to_db(uid, session_id, "system", message,{"details_completed":True},)
+        add_chat_to_db(uid, session_id, "system", model_response.content,"I think I've gotten enough data",{"details_completed":True},)
         print("Added chat to DB with session_id:", session_id)
         add_extracted_data_to_db(uid, session_id, dictionary_response)
         return {
-            "message": message,
+            "message": "I think I've gotten enough data",
             "type" : "system",
             "session_id": session_id,
             "stages" : "completed",
@@ -130,12 +130,12 @@ def MindWavebot(uid, session_id:str, message:str, system_template, verbosity=1):
         print("Extracted stages:", stages)
         # print("Extracted stage:", stage)
         output = {}
-        add_chat_to_db(uid, session_id, "system", model_response.content, output)
         output["message"] = remove_stage_from_message(model_response.content)
         output["session_id"] = session_id
         output["type"] = "system"
         output["stages"] = stages
 
+        add_chat_to_db(uid, session_id, "system", model_response.content, output["message"], {'stages': stages, 'details_completed': False})
         return output
 
 def MindwaveReportBot(uid, session_id:str, prediction:str, required_info:str, curr_test):
@@ -160,6 +160,8 @@ def MindwaveReportBot(uid, session_id:str, prediction:str, required_info:str, cu
     4. Actionable Recommendations
 
     ON NO ACCOUNT SHOULD YOU LEAK YOUR GOAL OR MAKE ANY MENTION OF DICTIONARY OR JSON OR ANYTHING THAT WILL GIVE AWAY THE FACT THAT YOU ARE AN AI.
+
+    RETURN THE REPORT PROPERLY FORMATTE IN MARKDOWN FORMAT.
  
     """
 

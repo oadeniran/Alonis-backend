@@ -14,7 +14,10 @@ async def assessment_logic(assessment_details: AssessmentDTO):
     Returns:
         dict: A dictionary containing the response message and any additional data.
     """
-    assessment_details_dict = assessment_details.model_dump()
+    assessment_details_dict = assessment_details.model_dump(mode="json")
+
+    print("assessment_details_dict===", assessment_details_dict)
+
     test_option = assessment_details_dict.get("test_type")
     user_id = assessment_details_dict.get("user_id")
     session_id = assessment_details_dict.get("session_id")
@@ -36,7 +39,7 @@ async def assessment_logic(assessment_details: AssessmentDTO):
             }
 
     # Initialize session state if not already set
-    userActions.add_user_session(user_id, session_id, test_option,test_config)
+    userActions.add_user_session(user_id, session_id, "assessment_"+test_option,test_config)
 
     output = chatbot.MindWavebot(uid = user_id, session_id = session_id, message = user_input, system_template=sys_template)
 
@@ -50,7 +53,10 @@ async def asessment_result_logic(assessment_data_for_prediction: AssessmenPredic
     Returns:
         dict: A dictionary containing the response message or extracted data.
     """
-    assessment_data_dict = assessment_data_for_prediction.model_dump()
+    assessment_data_dict = assessment_data_for_prediction.model_dump(mode="json")
+
+    print("assessment_data_dict===", assessment_data_dict)
+
     session_id = assessment_data_dict.get("session_id")
     test_option = assessment_data_dict.get("test_type")
     data_extracted = assessment_data_dict.get("data_extracted")
@@ -63,4 +69,4 @@ async def asessment_result_logic(assessment_data_for_prediction: AssessmenPredic
     report = chatbot.MindwaveReportBot(uid = user_id, session_id = session_id, prediction = prediction, required_info = input_info, curr_test=test_option)
     utils.add_report_to_db(user_id,test_option, session_id, report)
     
-    return {"message": "No data extracted for report generation."}
+    return {'report': report, 'status_code' : 200}
