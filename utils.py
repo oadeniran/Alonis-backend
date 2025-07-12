@@ -3,6 +3,9 @@ from datetime import datetime
 from core import chatActions, mental_prediction, big5_personality
 import pandas as pd
 import re
+import json
+from azure.storage.blob import BlobServiceClient, ContentSettings
+from config import AZURE_BLOB_CONNECTION_STR, EMBEDDINGS_CONTAINER_NAME
 
 POSSIBLE_SELECTIONS = {
     "mindlab": mental_prediction,
@@ -14,6 +17,41 @@ VERBOSITY_LEVEL = {
     2: "Moderate verbosity. Ask questions with some detail and context, providing a bit of expressiveness and guidance.",
     3: "High verbosity and expressiveness. Present scenarios or hypothetical situations and ask questions about how the user would respond to these situations, using their responses to assess and score."
 }
+
+def extract_dictionary_from_string(input_string):
+    # Regular expression to find dictionary-like structure in the string
+    dict_pattern = re.compile(r'\{.*?\}', re.DOTALL)
+    
+    # Search for the dictionary-like structure
+    match = dict_pattern.search(input_string)
+    
+    if match:
+        dict_string = match.group(0)
+        
+        # Attempt parsing the string to JSON
+        dictionary = clean_and_parse_json(dict_string)
+        return dictionary
+    else:
+        print("Error: No dictionary-like structure found in the input string.")
+        return None
+
+def clean_and_parse_json(input_string):
+    # Step 1: Clean input by removing newline characters and excessive whitespace
+    cleaned_string = re.sub(r'[\n\t]', '', input_string).strip()
+    
+    # Step 2: Convert single quotes to double quotes if needed
+    cleaned_string = cleaned_string.replace("'", '"')
+    
+    # Step 3: Handle any trailing commas inside the dictionary
+    cleaned_string = re.sub(r',(\s*[\}\]])', r'\1', cleaned_string)
+    
+    # Step 4: Try to parse the cleaned string into a JSON object
+    try:
+        dictionary = json.loads(cleaned_string)
+        return dictionary
+    except json.JSONDecodeError as e:
+        print(f"Error decoding JSON: {e}")
+        return None
 
 def dict_to_string(d, explanations=None):
     #i = 1
@@ -85,28 +123,66 @@ def add_extracted_data_to_db(uid, session_id:str, data:dict):
     }
     extractedDataCollection.insert_one(document)
 
-def add_report_to_db(uid, session_type, session_id:str, report:str):
-    document = {
-        "uid":uid,
-        "session_id":session_id,
-        "session_type":session_type,
-        "report":report,
-        "date":datetime.now(),
-        "is_archived" : False
-    }
-    reportsCollection.insert_one(document)
-
-    # Update the session to mark it as having a report
-    sessionsCollection.find_one_and_update(
-        {"uid": uid, "session_id": session_id},
-        {"$set": {"has_report": True}}
-    )
-
-def update_report_save_status(uid, session_id:str):
-    reportsCollection.find_one_and_update({"uid":uid, "session_id":session_id}, {"$set": {"saved": True}})
-
 def remove_embedded_data(session_id:str):
     print("Removing embedded data for session_id:", session_id)
     ragEmbeddingsCollection.delete_many({"current_session_id":session_id})
     print("Removed embedded data for session_id:", session_id)
 
+def upload_file_bytes(blob_name, file_bytes, content_type="application/octet-stream", container_name=EMBEDDINGS_CONTAINER_NAME,):
+    try:
+        blob_service_client = BlobServiceClient.from_connection_string(
+            AZURE_BLOB_CONNECTION_STR
+        )
+        
+        container_client = blob_service_client.get_container_client(
+            container_name
+        )
+
+        blob_client = container_client.get_blob_client(blob_name)
+
+        # Explicitly delete if exists
+        if blob_client.exists():
+            blob_client.delete_blob()
+
+        content_settings = ContentSettings(
+            content_type=content_type,
+            content_disposition="inline",
+        )
+
+        blob_client.upload_blob(
+            file_bytes,
+            overwrite=True,
+            blob_type="BlockBlob",
+            content_settings=content_settings,
+        )
+
+        print(f"File {blob_name} uploaded successfully.")
+        return blob_client.url
+
+    except Exception as ex:
+        print(f"Error during file upload: {ex}")
+        raise
+
+def download_file_bytes(blob_name, container_name=EMBEDDINGS_CONTAINER_NAME):
+    try:
+        blob_service_client = BlobServiceClient.from_connection_string(
+            AZURE_BLOB_CONNECTION_STR
+        )
+        
+        container_client = blob_service_client.get_container_client(
+            container_name
+        )
+
+        blob_client = container_client.get_blob_client(blob_name)
+
+        if not blob_client.exists():
+            print(f"Blob {blob_name} does not exist.")
+            return None
+
+        file_bytes = blob_client.download_blob().readall()
+        print(f"File {blob_name} downloaded successfully.")
+        return file_bytes
+
+    except Exception as ex:
+        print(f"Error during file download: {ex}")
+        raise

@@ -36,6 +36,12 @@ async def login_user(login_cred):
     
     resp = userActions.login(login_cred)
     if resp["status_code"] == 200:
+        asyncio.create_task(background_tasks.update_user_embeddings(
+           f"User {username} logged in at {datetime.now()}",
+           resp.get("uid", "default_user"),
+           meta_data={"login_time": datetime.now().isoformat()},
+           title="User Login"
+        ))
         return resp
     else:
         return {"error": resp["message"]}
@@ -95,6 +101,12 @@ async def add_user_note_or_goal(uid: str, note_details: dict):
 
     print(resp)
     if resp.get("status_code", 200) == 200:
+        asyncio.create_task(background_tasks.update_user_embeddings(
+            note_details,
+            uid,
+            meta_data={"note_added": datetime.now().isoformat()},
+            title="User Note/Goal Addition"
+        ))
         return resp
     else:
         return {"error": resp["message"]}
@@ -133,6 +145,12 @@ async def mark_goal_as_achieved(uid: str, note_id: str):
     
     try:
         result = userActions.mark_goal_as_achieved(uid, note_id)
+        asyncio.create_task(background_tasks.update_user_embeddings(
+            {"note_id": note_id, "status": "achieved"},
+            uid,
+            meta_data={"goal_achieved": datetime.now().isoformat()},
+            title="Goal Marked as Achieved"
+        ))
         return result   
     except Exception as e:
         print(e)

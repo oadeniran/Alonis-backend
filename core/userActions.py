@@ -1,4 +1,4 @@
-from db import usersCollection, reportsCollection, sessionsCollection
+from db import usersCollection, reportsCollection, sessionsCollection, dailyQuotesCollection, extractedDataCollection
 from bson import ObjectId
 import bcrypt
 from datetime import datetime
@@ -177,6 +177,48 @@ def get_user_reports(uid):
     #print(reports_formatted)
     return reports_formatted
 
+def get_extracted_data(uid, session_id:str):
+    extracted_data = extractedDataCollection.find_one({"uid": uid, "session_id": session_id})
+    if extracted_data:
+        return extracted_data["data"]
+    else:
+        return None
+
+def add_report_to_db(uid, session_type, session_id:str, report:str):
+    document = {
+        "uid":uid,
+        "session_id":session_id,
+        "session_type":session_type,
+        "report":report,
+        "date":datetime.now(),
+        "is_archived" : False
+    }
+    reportsCollection.insert_one(document)
+
+    # Update the session to mark it as having a report
+    sessionsCollection.find_one_and_update(
+        {"uid": uid, "session_id": session_id},
+        {"$set": {"has_report": True}}
+    )
+
+def update_report_save_status(uid, session_id:str):
+    reportsCollection.find_one_and_update({"uid":uid, "session_id":session_id}, {"$set": {"saved": True}})
+
+def get_last_report_for_assessment_type(uid, assessment_type):
+    report = reportsCollection.find_one(
+        {"uid": uid, "session_type": assessment_type},
+        sort=[("date", -1)]
+    )
+    if report:
+        return {
+            "session_id": report["session_id"],
+            "report_data": report["report"],
+            "is_saved": report.get("saved", False),
+            "status_code": 200
+        }
+    else:
+        return {"message": "No report found for this assessment type", "status_code": 404}
+
 def build_context_for_user(uid):
     context = {}
     try:
@@ -217,8 +259,8 @@ def build_context_for_user(uid):
     user_notes_and_goals = get_user_notes_and_goals(uid)
     if user_notes_and_goals:
         for note_or_goal in user_notes_and_goals:
-            if note_or_goal.get("is_goal", False):
-                context[f'a goal_provided_by user'] = {
+            if note_or_goal.get("is_goal", False) == True:
+                context[f'A goal provided_by user titled {note_or_goal["title"]}'] = {
                     "content": note_or_goal["title"] + " : " + 'Created on' + note_or_goal['date'] + note_or_goal["details"] + "\n" + ("Achieved" if note_or_goal.get("is_achieved", False) else "Not Achieved"),
                     "metadata": {
                         "source": "user_goal",
@@ -227,7 +269,7 @@ def build_context_for_user(uid):
                     }
                 }
             else:
-                context[f'note_provided_by_user'] = {
+                context[f'A note provided_by_user titled {note_or_goal["title"]}'] = {
                     "content": note_or_goal["title"] + ' : ' + note_or_goal["details"],
                     "metadata": {
                         "source": "user_note",
@@ -293,3 +335,40 @@ def mark_goal_as_achieved(uid, note_id):
     except Exception as e:
         print(e)
         return {"error": "Error marking note as achieved", "status_code": 400}
+    
+def add_daily_quote(uid, quote):
+    if not uid or uid == "":
+        return {"error": "Please sign up/login to continue"}
+    
+    if not quote or quote == "":
+        return {"error": "Quote is required"}
+    
+    today = datetime.now().strftime("%Y-%m-%d")
+    
+    dailyQuotesCollection.update_one(
+        {"uid": uid, "date": today},
+        {"$set": quote},
+        upsert=True
+    )
+    
+    return {"message": "Quote added successfully", "status_code": 200}
+
+def get_user_quote_for_today(uid):
+
+    user_quote_for_day = dailyQuotesCollection.find_one({
+        'uid': uid,
+        'date' : datetime.now().strftime( "%Y-%m-%d")
+    })
+
+    return user_quote_for_day
+
+def get_previous_quote(uid):
+    if not uid or uid == "":
+        return {"error": "Please sign up/login to continue"}
+    
+    prev_user_quote = dailyQuotesCollection.find_one({
+        'uid': uid,
+        'date': {"$lt": datetime.now().strftime("%Y-%m-%d")} # Get the most recent quote before today
+    }, sort=[("date", -1)])  # Sort by date in descending order to get the most recent quote
+
+    return prev_user_quote if prev_user_quote else {"message": "No previous quote found"}

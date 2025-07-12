@@ -209,3 +209,5 @@ __marimo__/
 pages/
 local/
 Home.py
+
+embeddings/

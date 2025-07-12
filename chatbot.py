@@ -11,7 +11,7 @@ from openai import OpenAI
 from datetime import datetime
 
 
-from utils import dict_to_string, add_extracted_data_to_db, remove_stage_from_message
+from utils import dict_to_string, add_extracted_data_to_db, remove_stage_from_message, extract_dictionary_from_string, clean_and_parse_json
 from core.chatActions import add_chat_to_db, get_chat_from_db
 from config import OPENAI_API_KEY
 
@@ -37,41 +37,6 @@ def get_chat_history_for_ai(uid, session_id):
 
         return new_messages
 
-def extract_dictionary_from_string(input_string):
-    # Regular expression to find dictionary-like structure in the string
-    dict_pattern = re.compile(r'\{.*?\}', re.DOTALL)
-    
-    # Search for the dictionary-like structure
-    match = dict_pattern.search(input_string)
-    
-    if match:
-        dict_string = match.group(0)
-        
-        # Attempt parsing the string to JSON
-        dictionary = clean_and_parse_json(dict_string)
-        return dictionary
-    else:
-        print("Error: No dictionary-like structure found in the input string.")
-        return None
-
-def clean_and_parse_json(input_string):
-    # Step 1: Clean input by removing newline characters and excessive whitespace
-    cleaned_string = re.sub(r'[\n\t]', '', input_string).strip()
-    
-    # Step 2: Convert single quotes to double quotes if needed
-    cleaned_string = cleaned_string.replace("'", '"')
-    
-    # Step 3: Handle any trailing commas inside the dictionary
-    cleaned_string = re.sub(r',(\s*[\}\]])', r'\1', cleaned_string)
-    
-    # Step 4: Try to parse the cleaned string into a JSON object
-    try:
-        dictionary = json.loads(cleaned_string)
-        return dictionary
-    except json.JSONDecodeError as e:
-        print(f"Error decoding JSON: {e}")
-        return None
-
 
 def extract_stage_from_message(message):
     stage_pattern = re.compile(r'CURRENT_STAGE:\s*(\d+)', re.DOTALL)
@@ -85,7 +50,7 @@ def extract_stage_from_message(message):
         return None
 
 def MindWavebot(uid, session_id:str, message:str, system_template, verbosity=1):
-    add_chat_to_db(uid, session_id, "user", message, {})
+    add_chat_to_db(uid, session_id, "user", message, message, {})
     
     sys_message = SystemMessagePromptTemplate.from_template(system_template)
     #print(sys_message)
@@ -100,9 +65,12 @@ def MindWavebot(uid, session_id:str, message:str, system_template, verbosity=1):
     
     session_chat_history = get_chat_history_for_ai(uid, session_id)
 
+    # print("Session chat history:", session_chat_history)
+
     model_response = chain.invoke(
             {"input": message, "chat_history": session_chat_history}
         )
+    #print("Model response:", model_response.content)
     #print("Extracting dictionary from diana_response.content 1")
     dictionary_response = extract_dictionary_from_string(model_response.content)
     if not dictionary_response:
@@ -138,28 +106,41 @@ def MindWavebot(uid, session_id:str, message:str, system_template, verbosity=1):
         add_chat_to_db(uid, session_id, "system", model_response.content, output["message"], {'stages': stages, 'details_completed': False})
         return output
 
-def MindwaveReportBot(uid, session_id:str, prediction:str, required_info:str, curr_test):
-    output = {}
+def MindwaveReportBot(uid, session_id:str, prediction:str, required_info:str, curr_test,data_extracted=None, previous_report=None):
     
     required_info_s = required_info
   
     system_template = f"""
 
-    You are a psychology expert and you are very good at evaluating the mental profile or psychological state of a person. A {curr_test} test was conducted and
+    You are ALONIS a persoanlized AI and you are very good at evaluating the mental profile or psychological state of your users. 
+    
+    A {curr_test} assessment was conducted by this user
 
-    The following information was collected from the user: {required_info_s}
+    The information about the assessment is as follows: {required_info_s}
 
-    Based on this a ML model has predicted that the user is {prediction}.
+    The following information was collected from the user based on their assessment: {data_extracted if data_extracted else "Not available"}
+
+    Based on this it has been predicted that the user is {prediction}.
+
+    Also the previous report for this user is as follows: {previous_report if previous_report else "No previous report available"}
 
     Generate an extensive report based on the information collected and the prediction made by the ML model. You have access to all the information collected from the user and you can use this information to generate the report.
 
     The report should be detailed and contain the following sections:
-    1. Assessment Summary
-    2. Detailed Predictions
-    3. Behavioral Indicators
-    4. Actionable Recommendations
+    - Assessment Summary (Including comparison with previous reports if available)
+    -  Prediction Analysis
+    - Behavioral Indicators
+    - Comparative Analysis with previous analysis result(if previous report is available)
+    - Actionable Recommendations
 
     ON NO ACCOUNT SHOULD YOU LEAK YOUR GOAL OR MAKE ANY MENTION OF DICTIONARY OR JSON OR ANYTHING THAT WILL GIVE AWAY THE FACT THAT YOU ARE AN AI.
+
+    ** MUST**
+    - Speak in a preofessional tone and first person language
+    - Use markdown format for the report
+    - Do not mention that you are an AI or a bot
+    - Do not mention that you are a mental health professional and do not give any medical advice
+    - Do not mention that you are a psychologist or a psychiatrist and end the report with a disclaimer that the report is for informational purposes only and should not be used as a substitute for professional medical advice, diagnosis, or treatment.
 
     RETURN THE REPORT PROPERLY FORMATTE IN MARKDOWN FORMAT.
  

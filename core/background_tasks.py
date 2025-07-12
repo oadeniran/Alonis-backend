@@ -39,20 +39,21 @@ async def init_user_embeddings(user_data: str):
     # Create embeddings for the user
     create_embeddings_for_user(docs, user_id)
 
-async def update_user_embeddings(data: str, user_id: str, meta_data = {}, session_id = "", title = "Context Data"):
+async def update_user_embeddings(data, user_id: str, meta_data = {}, session_id = "", title = "Context Data"):
     """
     Update the embeddings for a user with new data.
     """
     # Build the context from user data
     context = {
         'context': {
-            title: serialize_dict_to_text(data, indent=2)
-        },
-        'metadata': {
-            'source': 'user_update',
-            **meta_data
+            title: {"content" : serialize_dict_to_text(data, indent=2) if isinstance(data, dict) else data,
+                    'metadata': {
+                        'source': 'user_update',
+                        **meta_data
+                    }
+                }
+            }
         }
-    }
 
     # Create doc from context
     docs = create_docs(context, session_id)

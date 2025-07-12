@@ -27,3 +27,4 @@ azure-storage-blob
 uuid
 streamlit_chat
 bcrypt
+langchain-chroma
