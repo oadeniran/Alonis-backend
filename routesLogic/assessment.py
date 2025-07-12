@@ -87,7 +87,9 @@ async def asessment_result_logic(assessment_data_for_prediction: AssessmenPredic
     # Get the previous report if it exists
     previous_report = userActions.get_last_report_for_assessment_type(user_id, test_option)
 
-    report = chatbot.MindwaveReportBot(uid = user_id, session_id = session_id, prediction = prediction, required_info = input_info, curr_test=test_option, data_extracted=data_extracted, previous_report=previous_report)
+    data_extracted_str = utils.dict_to_string(data_extracted)
+
+    report = chatbot.MindwaveReportBot(uid = user_id, session_id = session_id, prediction = prediction, required_info = input_info, curr_test=test_option, data_extracted=data_extracted_str, previous_report=previous_report)
     userActions.add_report_to_db(user_id,test_option, session_id, report)
 
     asyncio.create_task(background_tasks.update_user_embeddings(

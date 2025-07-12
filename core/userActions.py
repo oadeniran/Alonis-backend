@@ -210,14 +210,9 @@ def get_last_report_for_assessment_type(uid, assessment_type):
         sort=[("date", -1)]
     )
     if report:
-        return {
-            "session_id": report["session_id"],
-            "report_data": report["report"],
-            "is_saved": report.get("saved", False),
-            "status_code": 200
-        }
+        return report.get("report", None)
     else:
-        return {"message": "No report found for this assessment type", "status_code": 404}
+        return "No previous report found for this assessment type"
 
 def build_context_for_user(uid):
     context = {}
