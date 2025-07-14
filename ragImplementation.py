@@ -193,7 +193,7 @@ def create_retriever(context_doc_list):
 
     return vstore.as_retriever()
 
-def load_model(retriever, chat_history, quote_flow=False, current_quote=None):
+def load_model(retriever, chat_history, quote_flow=False, current_quote=None, recommendation_flow=False, recommendation_context=None):
     llm = ChatOpenAI(api_key=OPENAI_API_KEY, model="gpt-4o-mini")
 
     if quote_flow:
@@ -218,6 +218,34 @@ def load_model(retriever, chat_history, quote_flow=False, current_quote=None):
 
         """
 
+        model_contexts = [
+            ("system", system_prompt)
+        ]
+    elif recommendation_flow:
+        
+        system_prompt = f"""
+        You are ALONIS, a personalized AI that provides users with personalized recommendations based on their data and past interactions.
+
+        The context you have access to include the user's data, past interactions, goals and random notes,past assessments chats and reports
+
+        You have access to the user's context and can use it to provide recommendations that matches the user's personality.
+
+        The current recommendations seen by the user are:
+
+        {recommendation_context}
+
+        Your are to return a new list of recommendations based on the user's updated context that you have and these recommendations should definitely be different from the current recommendations that the user is seeing.
+
+        """ + """
+        You are to return the recommendations in the following format:
+
+        [{{"title": "Title of the recommendation", "description": "Description of the recommendation including why this is being recommended to the user""}}]
+
+        Return the recommendations in safe format for JSON and ensure that it follows the format above exactly without any extra text or explanation.
+
+        \n\n
+        {context}
+        """
         model_contexts = [
             ("system", system_prompt)
         ]

@@ -1,6 +1,4 @@
 from core import userActions, chatActions, background_tasks
-import utils
-from config import OPENAI_API_KEY
 import asyncio
 from datetime import datetime
 
@@ -36,11 +34,10 @@ async def login_user(login_cred):
     
     resp = userActions.login(login_cred)
     if resp["status_code"] == 200:
-        asyncio.create_task(background_tasks.update_user_embeddings(
-           f"User {username} logged in at {datetime.now()}",
-           resp.get("uid", "default_user"),
-           meta_data={"login_time": datetime.now().isoformat()},
-           title="User Login"
+        # Start a background task to update user embeddings with login details
+        asyncio.create_task(background_tasks.run_sequenced_user_login_tasks(
+            uid=resp.get("uid", "default_user"),
+            username=username 
         ))
         return resp
     else:
@@ -111,16 +108,16 @@ async def add_user_note_or_goal(uid: str, note_details: dict):
     else:
         return {"error": resp["message"]}
     
-async def get_user_notes_and_goals(uid):
+async def get_user_notes_and_goals(uid, page = 1):
     if not uid or uid == "":
         return {"error": "Please sign up/login to continue"}
     
-    notes_and_goals = userActions.get_user_notes_and_goals(uid)
+    notes_and_goals = userActions.get_user_notes_and_goals(uid, page)
 
     if not notes_and_goals:
         return {"error": "No notes or goals found for this user"}
     
-    return {"notes_and_goals": notes_and_goals, "status_code": 200}
+    return notes_and_goals
 
 async def delete_note_or_goal(uid, note_id):
     if not uid or uid == "":
@@ -155,3 +152,39 @@ async def mark_goal_as_achieved(uid: str, note_id: str):
     except Exception as e:
         print(e)
         return {"error": "Error marking note as achieved", "status_code": 400}
+    
+async def get_alonis_recommendations(uid: str, rec_type = 'alonis_recommendation', page: int = 1):
+    if not uid or uid == "":
+        return {"error": "Please sign up/login to continue"}
+    
+    recommendations = None
+    
+    if rec_type == 'alonis_recommendation':
+        recommendations = userActions.get_current_alonis_recommendations(uid, rec_type=rec_type, page = page)
+
+    if not recommendations:
+        return {"error": "No Alonis recommendations found for this user"}
+    
+    return recommendations
+
+async def mark_interaction_with_recommendation(uid: str, rec_id: str):
+    if not uid or uid == "":
+        return {"error": "Please sign up/login to continue"}
+    
+    if not rec_id or rec_id == "":
+        return {"error": "Recommendation ID is required"}
+    
+    resp = userActions.mark_interaction_with_recommendation(uid, rec_id)
+
+    if resp["status_code"] != 200:
+        return {"error": resp["message"]}
+    print(resp)
+    asyncio.create_task(background_tasks.update_user_embeddings(
+        {'good thing to note': 'user interacted with a recommendation',
+         'recommendation details': resp.get('result', {})},
+        uid,
+        meta_data={"interaction_with_rec": datetime.now().isoformat()},
+        title=f"User Interacted with Recommendation titlled : {resp.get('result', {}).get('title', 'Unknown')}"
+    ))
+    
+    return resp

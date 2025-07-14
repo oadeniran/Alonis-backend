@@ -1,6 +1,7 @@
 from db import notes_and_goalsCollection
 from datetime import datetime
 from bson import ObjectId
+from config import NOTES_PER_PAGE
 
 def add_notes(uid, notes_details):
     try:
@@ -75,15 +76,35 @@ def mark_note_as_archived(uid, note_id):
             "status_code": 400
         }
 
-def get_user_notes_and_goals(uid):
+def get_user_notes_and_goals(uid, page: int = 1):
     try:
-        notes = notes_and_goalsCollection.find({"uid": uid, 'is_archived': False}).sort("date", -1)  # Sort by date in descending order
+        per_page = NOTES_PER_PAGE
+        skip = (page - 1) * per_page
+
+        cursor = (
+            notes_and_goalsCollection
+            .find({"uid": uid, 'is_archived': False})
+            .sort("date", -1)
+            .skip(skip)
+            .limit(page * per_page)  # Custom rule: 12 * page
+        )
+
+        total = notes_and_goalsCollection.count_documents({"uid": uid, 'is_archived': False})
+
         notes_list = []
-        for note in notes:
-            note['_id'] = str(note['_id'])  # Convert ObjectId to string for JSON serialization
-            note['date'] = note['date'].strftime('%Y-%m-%d %H:%M:%S') # Format date for better readability
+        for note in cursor:
+            note['_id'] = str(note['_id'])
+            note['date'] = note['date'].strftime('%Y-%m-%d %H:%M:%S')
             notes_list.append(note)
-        return notes_list
+
+        return {
+            "notes_and_goals": notes_list,
+            "page": page,
+            "count": len(notes_list),
+            'has_next_page': (page * per_page) < total,
+            'status_code': 200
+        }
+
     except Exception as e:
         print(e)
         return {

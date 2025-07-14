@@ -1,9 +1,10 @@
 from fastapi import APIRouter
 from routesLogic import userActions
-router = APIRouter()
+from typing import Literal
 from dtos.user_dto import UserDTO, UserLoginDTO
 from dtos.notes_dto import Note_AND_GOAL
 
+router = APIRouter()
 @router.post("/sign-up")
 async def sign_up(user_details: UserDTO):
     """
@@ -87,17 +88,18 @@ async def add_note_or_goal(note_details: Note_AND_GOAL):
     return await userActions.add_user_note_or_goal(note_details.uid, note_details.model_dump())
 
 @router.get("/{uid}/get-notes-and-goals")
-async def get_user_notes_and_goals(uid: str):
+async def get_user_notes_and_goals(uid: str, page: int = 1):
     """
-    Endpoint to retrieve all notes and goals for a user.
+    Endpoint to retrieve paginated notes and goals for a user.
     
     Args:
         uid (str): User ID.
+        page (int): Page number (default = 1).
     
     Returns:
-        dict: A dictionary containing all notes and goals or an error message.
+        dict: Notes and goals with pagination.
     """
-    return await userActions.get_user_notes_and_goals(uid)
+    return await userActions.get_user_notes_and_goals(uid, page)
 
 @router.post("/{uid}/mark-goal-as-achieved/{note_id}")
 async def mark_goal_as_achieved(uid: str, note_id: str):
@@ -126,3 +128,35 @@ async def delete_note_or_goal(uid: str, note_id: str):
         dict: A dictionary containing a success message or an error message.
     """
     return await userActions.delete_note_or_goal(uid, note_id)
+
+@router.get("/{uid}/alonis-recommendations/{rec_type}")
+async def get_alonis_recommendations(
+    uid: str,
+    rec_type: Literal['alonis_recommendation', 'alonis_recommendation_movies', 'alonis_recommendation_songs'] = 'alonis_recommendation',
+    page: int = None
+):
+    """
+    Endpoint to retrieve personalized Alonis recommendations for a user.
+    
+    Args:
+        uid (str): User ID.
+        limit (int): Number of recommendations to retrieve.
+    
+    Returns:
+        dict: A dictionary containing the recommendations or an error message.
+    """
+    return await userActions.get_alonis_recommendations(uid, rec_type, page)
+
+@router.post("/{uid}/mark-interaction-with-recommendation/{rec_id}")
+async def mark_interaction_with_recommendation(uid: str, rec_id: str):
+    """
+    Endpoint to mark an interaction with a recommendation for a user.
+    
+    Args:
+        uid (str): User ID.
+        rec_id (str): Recommendation ID to be marked.
+    
+    Returns:
+        dict: A dictionary containing a success message or an error message.
+    """
+    return await userActions.mark_interaction_with_recommendation(uid, rec_id)

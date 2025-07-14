@@ -53,6 +53,71 @@ def clean_and_parse_json(input_string):
         print(f"Error decoding JSON: {e}")
         return None
 
+
+def extract_list_from_string(input_string):
+        print(input_string)
+        # Regular expression to find list-like structure in the string
+        start = input_string.find('[')
+        end = input_string.rfind(']')
+        if start != -1 and end != -1:
+            list_string = input_string[start:end+1]
+            # Attempt parsing the string to JSON
+            list_object = clean_and_parse_list_json(list_string)
+            return list_object
+        else:
+            print("Error: No list-like structure found in the input string.")
+            return None, None, "No list-like structure found in the input string. Check etrxaction of questions or retry"
+
+def clean_and_parse_list_json(input_string):
+  print("INPUT", input_string)
+  # Step 1: Clean input by removing newline characters and excessive whitespace
+  cleaned_string = input_string.strip()
+  print("Cleaned", cleaned_string)
+  cleaned_string = cleaned_string.replace("False", "false").replace("True", "true")
+
+  # Step 1: Clean input by removing newline characters and excessive whitespace
+  cleaned_string = input_string.strip()
+  print("Cleaned", cleaned_string)
+
+  cleaned_string = re.sub(r'\n+', ' ', cleaned_string)  # Replace multiple newlines with a space
+
+  # Fix incorrect double quotes used for apostrophes (e.g., product"s → product's)
+  cleaned_string = re.sub(r'(\w)"(\w)', r"\1'\2", cleaned_string)
+
+  # Clean for latex
+  cleaned_string = re.sub(r'(?<!\\)\\(?![\\"])', r'\\\\', cleaned_string)
+
+  # Ensure double quotes are properly escaped within text values
+  #cleaned_string = re.sub(r'(?<!\\)"', r'\"', cleaned_string)
+
+  """# Remove unnecessary spaces and newlines
+  cleaned_string = re.sub(r'\s+', ' ', cleaned_string).strip()
+
+  # Fix trailing commas (JSON does not allow trailing commas)
+  cleaned_string = re.sub(r',\s*([\]}])', r'\1', cleaned_string)"""
+
+  # Step 4: Try to parse the cleaned string into a JSON object
+#   try:
+#       dictionary = json.loads(cleaned_string)
+#       return dictionary, None, None
+#   except json.JSONDecodeError as e:
+#       print(f"Error decoding JSON: {e}")
+#       return None, cleaned_string, f"Error decoding JSON: {e}"
+  
+  try:
+    dictionary = json.loads(cleaned_string)
+    return dictionary, None, None
+  except json.JSONDecodeError as e:
+    print(f"Error decoding JSON: {e}")
+    if e.pos == len(cleaned_string):
+        print("Error happened at end of string, adding another square bracket close and trying again")
+        try:
+            dictionary = json.loads(cleaned_string+"]")
+            return dictionary, None, None
+        except json.JSONDecodeError as e:
+            print(f"Still ran into error and the error is Error decoding JSON: {e}")
+    return None, cleaned_string, f"Still ran into error and the error is Error decoding JSON: {e}"
+
 def dict_to_string(d, explanations=None):
     #i = 1
     result = []

@@ -1,8 +1,9 @@
-from db import usersCollection, reportsCollection, sessionsCollection, dailyQuotesCollection, extractedDataCollection
+from db import usersCollection, reportsCollection, sessionsCollection, dailyQuotesCollection, extractedDataCollection, recommendationsCollection
 from bson import ObjectId
 import bcrypt
 from datetime import datetime
 from core.notesActions import get_user_notes_and_goals, add_notes, set_goal_as_achieved, mark_note_as_archived
+from config import RECOMMENDATIONS_PER_PAGE
 
 def encrypt_password(password):
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
@@ -52,6 +53,8 @@ def login(login_det):
     if details:
         print(str(details["_id"]))
         if check_password(login_det["password"], details["password"]):
+            # Increment the login count
+            usersCollection.update_one({"_id": ObjectId(details["_id"])}, {"$inc": {"login_count": 1}})
             return {
                     "message" : "Sign In successful",
                     "status_code" : 200,
@@ -367,3 +370,123 @@ def get_previous_quote(uid):
     }, sort=[("date", -1)])  # Sort by date in descending order to get the most recent quote
 
     return prev_user_quote if prev_user_quote else {"message": "No previous quote found"}
+
+def add_recommendations(uid, recommendations, rec_type='alonis_recommendation'):
+    if not uid or uid == "":
+        return {"error": "Please sign up/login to continue"}
+    
+    if not recommendations or not isinstance(recommendations, list):
+        return {"error": "Recommendations must be a list"}
+    
+    ACTIONS_DICT = {
+        'alonis_recommendation': {},
+        'alonis_recommendation_movies': {"name" : "Watched this movie", "status": False},
+        'alonis_recommendation_songs': {"name" : "Listened to this song", "status": False},
+        'alonis_recommendation_books': {"name" : "Read this book", "status": False},
+        'alonis_recommendation_news': {}
+    }
+    
+    recommendations_to_insert = [
+            {
+                **new_recommendation, "uid": uid, "date": datetime.now(), 'type': rec_type,
+                'is_read_by_user': False, # Default value for is_read_by_user
+                'action': ACTIONS_DICT.get(rec_type, {})
+            }  
+            for new_recommendation in recommendations
+        ]
+    
+    try:
+        recommendationsCollection.insert_many(recommendations_to_insert)
+        return {"message": "Recommendations added successfully", "status_code": 200}
+    except Exception as e:
+        print(e)
+        return {"error": "Error adding recommendations", "status_code": 400}
+
+def get_current_alonis_recommendations(uid, rec_type='alonis_recommendation', page=None):
+    """
+    Get personalized Alonis recommendations based on user data and interactions.
+    
+    Args:
+        uid (str): User ID.
+        rec_type (str): Type of recommendation.
+        page (int or None): If provided, enables pagination (20 * page).
+        
+    Returns:
+        dict: Recommendations and status.
+    """
+    try:
+        query = {"uid": uid, "type": rec_type}
+        cursor = recommendationsCollection.find(query).sort("date", -1)
+
+        if page is not None:
+            limit = RECOMMENDATIONS_PER_PAGE * int(page)
+            cursor = cursor.limit(limit)
+
+        recommendations = list(cursor)
+
+        for rec in recommendations:
+            rec['id'] = str(rec['_id'])
+            del rec['_id']
+            if 'date' in rec:
+                rec['date'] = rec['date'].strftime("%Y-%m-%d %H:%M:%S")
+        
+        total_recommendations = recommendationsCollection.count_documents(query)
+
+        return {
+            "recommendations": recommendations,
+            "count": len(recommendations),
+            "page": page,
+            'has_next_page': (page is not None and (20 * int(page)) < total_recommendations),
+            "status_code": 200
+        }
+
+    except Exception as e:
+        print(f"Error fetching recommendations: {e}")
+        return 
+            
+def confirm_to_add_more_alonis_recommendations(uid, rec_type='alonis_recommendation'):
+    """
+    Confirm to add more Alonis recommendations for the user.
+    This function returns true is the number of recommdendation with type 'rec_type' that has 'is_read_by_user' set to True is greater than 0.6 of the total recommendations of type 'rec_type'.
+    """
+
+    try:
+        current_alonis_recs = recommendationsCollection.find({"uid": uid, 'type': rec_type, 'is_read_by_user': True})
+        total_alonis_recs = recommendationsCollection.count_documents({"uid": uid, 'type': rec_type})
+        
+        if total_alonis_recs == 0:
+            return True  # No recommendations to check against
+        
+        read_ratio = current_alonis_recs.count() / total_alonis_recs
+        
+        return read_ratio > 0.6
+    except Exception as e:
+        print(f"Error confirming recommendations: {e}")
+        return False
+
+def mark_interaction_with_recommendation(uid, rec_id):
+    """
+    Mark an interaction with a recommendation for a user.
+    
+    Args:
+        uid (str): User ID.
+        rec_id (str): Recommendation ID.
+        
+    Returns:
+        dict: Success or error message.
+    """
+    try:
+        result = recommendationsCollection.find_one_and_update(
+            {"uid": uid, "_id": ObjectId(rec_id)},
+            {"$set": {"is_read_by_user": True}},
+            return_document=True
+        )
+        del result['_id']  # Remove the ObjectId for JSON serialization
+        
+        if result:
+            return {"message": "Interaction marked successfully", "status_code": 200, "result": result}
+        else:
+            return {"error": "Recommendation not found", "status_code": 404}
+    except Exception as e:
+        print(f"Error marking interaction: {e}")
+        return {"error": "Error marking interaction", "status_code": 400}

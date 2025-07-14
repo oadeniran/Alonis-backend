@@ -16,5 +16,6 @@ ragEmbeddingsCollection = db["ragEmbeddings"]
 sessionsCollection = db["sessions"]
 notes_and_goalsCollection = db["notes_and_goals"]
 dailyQuotesCollection = db['dailyQuotes']
+recommendationsCollection = db['recommendations']
 
 # Define DB actions
