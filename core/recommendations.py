@@ -1,16 +1,15 @@
 import requests
-from config import QLOO_API_URL, QLOO_API_KEY
 import ragImplementation as rag
 from utils import extract_list_from_string, dict_to_string
 from core.userActions import get_current_alonis_recommendations
 from datetime import datetime
 
-def get_alonis_recommendations(user_id, limit=10):
+async def get_alonis_recommendations(user_id, limit=10):
     """
     Get Pernaolized Alonis recommendations based on user data and interactions.
     """
 
-    retriever = rag.load_user_retriever(user_id)
+    retriever = await rag.load_user_retriever(user_id)
 
     current_user_recommendations = get_current_alonis_recommendations(user_id, limit)
 
@@ -31,8 +30,4 @@ def get_alonis_recommendations(user_id, limit=10):
         print("No recommendations generated or the format is incorrect.")
         print("Recommendation text:", recommendation_text)
         print("New recommendations:", new_recommendations)
-
-
-
-
 

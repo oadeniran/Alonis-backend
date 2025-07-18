@@ -31,12 +31,12 @@ def save_session_embeddings(text, user_id, api_key):
 def create_retriever(context_docs):
     return rag.create_retriever(context_docs)
 
-def load_retriever(uid):
-    return rag.load_user_retriever(uid)
+async def load_retriever(uid):
+    return await rag.load_user_retriever(uid)
 
-def load_model(retriever, uid, session_id, quote_flow=False, current_quote=None):
+def load_model(retriever, uid, session_id, quote_flow=False, previous_quotes=None):
     if quote_flow:
-        return rag.load_model(retriever, [], quote_flow=True, current_quote=current_quote)
+        return rag.load_model(retriever, [], quote_flow=True, previous_quotes=previous_quotes)
     else:
         # If not in quote flow, we can use the chat history for the session
         return rag.load_model(retriever, get_chat_history_for_ai(uid, session_id))
@@ -64,18 +64,18 @@ def getQuote(model, uid):
         "uid": uid
     }
 
-def talkToMe(uid, session_id, message, context_doc_list= None):
+async def talkToMe(uid, session_id, message, context_doc_list= None):
     if context_doc_list is not None:
         retriever = create_retriever(context_doc_list)
     else:
-        retriever = load_retriever(uid)
+        retriever = await load_retriever(uid)
 
     model = load_model(retriever, uid, session_id)
     return letsTalk(message, model, uid, session_id)
 
-def giveMeAQuoute(uid, current_quote=None):
-    retriever = load_retriever(uid)
-    model = load_model(retriever, uid, None, quote_flow=True, current_quote=current_quote)
+async def giveMeAQuoute(uid, previous_quotes=None):
+    retriever = await load_retriever(uid)
+    model = load_model(retriever, uid, None, quote_flow=True, previous_quotes=previous_quotes)
     return getQuote(model, uid)
 
     

@@ -16,6 +16,9 @@ from utils import upload_file_bytes, download_file_bytes
 from pathlib import Path
 import shutil
 import zipfile
+from locks import chroma_guard
+import asyncio
+from datetime import datetime
 
 # Shared splitter & embedder
 SPLITTER  = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
@@ -50,7 +53,7 @@ def _get_store(user_id: str):
         embedding_function=EMBEDDING
     )
 
-def upload_embeddings_to_azure(user_id: str):
+async def upload_embeddings_to_azure(user_id: str):
     """
     Upload the embeddings for a user to Azure Blob Storage.
     This is useful for backup and loading the embeddings later.
@@ -106,38 +109,44 @@ def download_and_restore_user_embeddings(user_id: str):
     zip_path.unlink()
     return "done"
 
-def create_embeddings_for_user(docs, user_id: str) -> str:
+async def create_embeddings_for_user(docs, user_id: str) -> str:
     """Create a fresh store (overwrites any existing one)."""
     splits = SPLITTER.split_documents(docs)
 
     # Generate truly unique ids per split to avoid future collisions
     ids = [f"{user_id}_{uuid4().hex}" for _ in splits]
 
-    Chroma.from_documents(
-        documents=splits,
-        ids=ids,
-        persist_directory=os.path.join(EMBEDDINGS_DIR, user_id),
-        embedding=EMBEDDING
-    )
+    # Create the store and add documents. Use async context manager to ensure the lock is acquired and released properly. This way we can ensure that no other process is trying to write to the same user's store at the same time.
+    async with chroma_guard(user_id):
+        Chroma.from_documents(
+            documents=splits,
+            ids=ids,
+            persist_directory=os.path.join(EMBEDDINGS_DIR, user_id),
+            embedding=EMBEDDING
+        )
 
     # Upload the embeddings to Azure Blob Storage for backup and loading
-    upload_embeddings_to_azure(user_id)
+    asyncio.create_task(upload_embeddings_to_azure(user_id))
     return "done"
 
-def update_embeddings_for_user(docs, user_id: str) -> str:
+async def update_embeddings_for_user(docs, user_id: str) -> str:
     """Append new docs to an existing user store (creates one if absent)."""
-    if not os.path.exists(os.path.join(EMBEDDINGS_DIR, user_id)):
-        # No store yet → Try loading from azure Blob Storage and if still not there then build context from user data
-        try:
-            res = download_and_restore_user_embeddings(user_id)
-        except Exception as e:
-            res = None # If the file doesn't exist, then just create an empty store
-        if res is None:
-            # Create with context that is built from user data
-            user_context = build_context_for_user(user_id)
-            user_context_docs = create_docs(user_context, "")
-            create_embeddings_for_user(user_context_docs, user_id)
+    # use chroma_guard to ensure that no other process is trying to write to the same user's store at the same time
+    async with chroma_guard(user_id):
+        if not os.path.exists(os.path.join(EMBEDDINGS_DIR, user_id)):
+            # No store yet → Try loading from azure Blob Storage and if still not there then build context from user data
+            try:
+                res = download_and_restore_user_embeddings(user_id)
+            except Exception as e:
+                print(f"Error restoring user embeddings for {user_id}: {e}")
+                res = None # If the file doesn't exist, then just create an empty store
+            if res is None:
+                # Create with context that is built from user data
+                user_context = build_context_for_user(user_id)
+                user_context_docs = create_docs(user_context, "")
+                await create_embeddings_for_user(user_context_docs, user_id)
 
+    
     store  = _get_store(user_id)
 
     splits = SPLITTER.split_documents(docs)
@@ -146,10 +155,10 @@ def update_embeddings_for_user(docs, user_id: str) -> str:
     store.add_documents(documents=splits, ids=ids)
 
     # Upload the embeddings to Azure Blob Storage for backup and loading
-    upload_embeddings_to_azure(user_id)
+    asyncio.create_task(upload_embeddings_to_azure(user_id))
     return "done"
 
-def load_user_retriever(user_id: str):
+async def load_user_retriever(user_id: str):
     """
     Load a retriever for a given user's vectorstore.
 
@@ -159,21 +168,27 @@ def load_user_retriever(user_id: str):
     Returns:
         VectorStoreRetriever: A retriever instance ready to use.
     """
-    if not os.path.exists(os.path.join(EMBEDDINGS_DIR, user_id)):
-        # No store yet → Try loading from azure Blob Storage and if still not there then build context from user data
-        try:
-            res = download_and_restore_user_embeddings(user_id)
-        except Exception as e:
-            res = None # If the file doesn't exist, then just create an empty store
-        if res is None:
-            # Create with context that is built from user data
-            user_context = build_context_for_user(user_id)
-            print("user_context===", user_context)
-            user_context_docs = create_docs(user_context, "")
-            create_embeddings_for_user(user_context_docs, user_id)
+    # use chroma_guard to ensure that no other process is trying to write to the same user's store at the same time
+    async with chroma_guard(user_id):
+        if not os.path.exists(os.path.join(EMBEDDINGS_DIR, user_id)):
+            # No store yet → Try loading from azure Blob Storage and if still not there then build context from user data
+            try:
+                res = download_and_restore_user_embeddings(user_id)
+            except Exception as e:
+                res = None # If the file doesn't exist, then just create an empty store
+            if res is None:
+                # Create with context that is built from user data
+                user_context = build_context_for_user(user_id)
+                print("user_context===", user_context)
+                user_context_docs = create_docs(user_context, "")
+                await create_embeddings_for_user(user_context_docs, user_id)
         
-    store = _get_store(user_id)
-    return store.as_retriever()
+    # Now we can safely load the store
+    # use chroma_guard to ensure that no other process is trying to write to the same user's store at the same time
+    async with chroma_guard(user_id):
+        # Load the store
+        store = _get_store(user_id)
+        return store.as_retriever()
 
 
 def create_retriever(context_doc_list):
@@ -193,7 +208,7 @@ def create_retriever(context_doc_list):
 
     return vstore.as_retriever()
 
-def load_model(retriever, chat_history, quote_flow=False, current_quote=None, recommendation_flow=False, recommendation_context=None):
+def load_model(retriever, chat_history, quote_flow=False, previous_quotes=None, recommendation_flow=False, recommendation_context=None):
     llm = ChatOpenAI(api_key=OPENAI_API_KEY, model="gpt-4o-mini")
 
     if quote_flow:
@@ -203,11 +218,12 @@ def load_model(retriever, chat_history, quote_flow=False, current_quote=None, re
         The context you have access to include the user's data, past interactions, goals and random notes,past assessments chats and reports 
         You have access to the user's context and can use it to provide quotes that matches the user's personality.If you do not have enough context to provide a personalized quote, then return a radom quote
 
-        The current quote seen by the user for previous day is:
-        
-        {current_quote}
+        The past 10 previous quotes seen by the user are:
 
-        YOU MUST RETURN A NEW QUOTE DIFFERENT FROM THE CURRENT QUOTE THAT THE USERE IS SEEING USING YOUR KNOWLEDGE BASE.
+        {previous_quotes}
+        
+
+        YOU MUST RETURN A NEW QUOTE DIFFERENT FROM THESE QUOTES THAT THE USERE HAVE SEEN USING YOUR KNOWLEDGE BASE.
         \n\n
         """ + """Your are to return the quote in the following format:
 
@@ -250,23 +266,29 @@ def load_model(retriever, chat_history, quote_flow=False, current_quote=None, re
             ("system", system_prompt)
         ]
     else:
-        system_prompt = (
-        "You are ALONIS, a compassionate perosnalized AI talsking to users about anything on their mind and  helping users talk about their emotions and providing support to help them feel better. "
-        "You have access and context of everything the user has talked about in the past, every interaction they have had with you  and you can use this context to provide personalized responses. "
+        system_prompt = f" Today is {datetime.now().strftime('%Y-%m-%d')}. and the time is {datetime.now().strftime('%H:%M:%S')}.\n\n" + """
+        You are ALONIS, a compassionate perosnalized AI talsking to users about anything on their mind and  helping users talk about their emotions and providing support to help them feel better. You have been provided the date and time of the day so you can use it to provide time relative responses to the user.
+        You have access and context of everything the user has talked about in the past, every interaction they have had with you  and you can use this context to provide personalized responses.
         "The context you have access to include the user's data, past interactions, goals and random notes,past assessments chats and reports"
-        "When responding to user, yopu are fully aware of the context of what is being spoken about therefore if a context is based on the Notes or Goals the user has added, your responses reflcet that you aware its a note or goal and you are aware of the details of the note or goal. If its about a previous assessment, you are aware of the details of the assessment and you are aware of the context of the assessment."
-        "Since the user is aware that you have context of every of their data, its possible for them to ask you about anything they have said in the past, any goal they have added, any note they have added, any assessment they have done and you are aware of the details of that data, you are to ensure that you try your best as muchj as possible to provide a helpful response based on the context of the data and the context of the conversation. "
-        "The context you have access to is always up to date, so you need to esnure that you always use the context to provide personalized responses that will be very helpful to the user as an anwser to their question or as a response to their message. "
-        "When responding, acknowledge the user's feelings and offer thoughtful, emotionally supportive responses. "
-        "If you feel the context is unclear, ask gentle, open-ended questions to better understand the user. "
-        "Keep your tone empathetic and aim to help the user feel heard and understood."
-        "When there is no message from the user and no chat history, Greet the user, welcome the user to the session, ask what's on their mind and suggest possible things that they can talk about based on context of their data and past interactions with you. Thes posible things should be very specific and tailored to the user. for example a goal they added recently or something they said in a prevuious assessment etc"
+        When responding to user, yopu are fully aware of the context of what is being spoken about therefore if a context is based on the Notes or Goals the user has added, your responses reflcet that you aware its a note or goal and you are aware of the details of the note or goal. If its about a previous assessment, you are aware of the details of the assessment and you are aware of the context of the assessment.
+        Since the user is aware that you have context of every of their data, its possible for them to ask you about anything they have said in the past, any goal they have added, any note they have added, any assessment they have done and you are aware of the details of that data, you are to ensure that you try your best as muchj as possible to provide a helpful response based on the context of the data and the context of the conversation.
+        The context you have access to is always up to date, so you need to esnure that you always use the context to provide personalized responses that will be very helpful to the user as an anwser to their question or as a response to their message.
+        When responding, acknowledge the user's feelings and offer thoughtful, emotionally supportive responses.
+        If you feel the context is unclear, ask gentle, open-ended questions to better understand the user.
+        Keep your tone empathetic and aim to help the user feel heard and understood.
+        When there is no message from the user and no chat history, Greet the user, welcome the user to the session, ask what's on their mind and suggest possible things that they can talk about based on context of their data and past interactions with you. Thes posible things should be very specific and tailored to the user. for example a goal they added recently or something they said in a prevuious assessment etc
+
+        ** IMPORTANT NOTES THAT MUST BE FOLLOWED **
+        - If it is the start of a new convesation with no chat history, BE VERY SPECIFIC IN YOUR SUGGESTIONS OF WHAT THE USER CAN TALK ABOUT, BASED ON THEIR CONTEXT AND PAST INTERACTIONS WITH YOU. DO NOT BE GENERIC, BE VERY SPECIFIC AND TAILORED TO THE USER.
+        - For time relative questions, the context you have contains date and timne of actions carried out by the user, YOU MUST PRIORITIZE THAT CONTEXT OVER THE CURRENT TIME AND DATE. For example, if the user asks "What did I do yesterday?" you should use the context of the user's data to provide a response based on what the user did yesterday.
+        - When applicable ask follow up questions to clarify the user's needs or feelings, especially if the context is not clear and you can suggest more discussion topics to keep the conversation going and help the user feel more comfortable sharing.
+
         "\n\n"
-        "{context}"
+        {context}
         "\n\n"
-        "Chat History"
-        f"{chat_history}"
-        )
+        "Chat History
+        """ + f"{chat_history}"
+        
         model_contexts = [
             ("system", system_prompt),
             ("human", "{input}"),

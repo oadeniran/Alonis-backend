@@ -1,7 +1,6 @@
 from core import talksSessions, userActions,background_tasks
 import utils
 import uuid
-from config import OPENAI_API_KEY
 from datetime import datetime
 import asyncio
 
@@ -16,7 +15,7 @@ async def mindwave_talk_session(uid: str, session_id: str, user_input: str = "")
     
     context_doc_list = None # talksSessions.get_context_doc_list(userActions.build_context_for_user(uid), session_id)
 
-    output = talksSessions.talkToMe(uid, session_id, user_input, context_doc_list=context_doc_list)
+    output = await talksSessions.talkToMe(uid, session_id, user_input, context_doc_list=context_doc_list)
 
     if context_doc_list is not None:
         # Then remove the embedding from mongo since its what we used to create the context
@@ -43,10 +42,14 @@ async def get_personalized_quote(uid: str):
         return {'quote' : user_quote}
     
     # If no quote for today, generate a new one
-    previous_quote = userActions.get_previous_quote(uid)
-    previous_quote = previous_quote.get('quote', "No previous quote seen by user")  # Ensure we have a quote to work with
+    previous_quote = userActions.get_previous_quotes(uid)
+    if previous_quote.get('count', 0) > 0:
+        previous_quotes  = [utils.dict_to_string(prev_quote) for prev_quote in previous_quote.get('quotes', [])]
+        previous_quotes = "\n".join(previous_quotes)
+    else:
+        previous_quotes = "No previous quotes available."
 
-    quote = talksSessions.giveMeAQuoute(uid, previous_quote)
+    quote = await talksSessions.giveMeAQuoute(uid, previous_quotes)
     if not quote:
         return {"error": "No quotes available at the moment"}
 

@@ -205,9 +205,9 @@ def upload_file_bytes(blob_name, file_bytes, content_type="application/octet-str
 
         blob_client = container_client.get_blob_client(blob_name)
 
-        # Explicitly delete if exists
-        if blob_client.exists():
-            blob_client.delete_blob()
+        # Explicitly delete if exists - comment out to avoid concurency issues where another process might be trying to access the same blob but cannot because it is being deleted
+        # if blob_client.exists():
+        #     blob_client.delete_blob()
 
         content_settings = ContentSettings(
             content_type=content_type,

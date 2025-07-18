@@ -1,7 +1,32 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from config import appENV, PORT
 from routes import assessmentRoutes, talkRoutes, userActionsRoutes, commonRoutes  # Import routes
+from starlette.middleware.base import BaseHTTPMiddleware
+import json
+
+class LogResponseMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # Capture response
+        response = await call_next(request)
+
+        # Read and decode the response body (works if it's JSON or text)
+        response_body = b""
+        async for chunk in response.body_iterator:
+            response_body += chunk
+
+        try:
+            decoded = response_body.decode()
+            if decoded.startswith('{') or decoded.startswith('['):
+                parsed = json.loads(decoded)
+                print(f"[RESPONSE] {request.url.path} ->", json.dumps(parsed, indent=2))
+            else:
+                print(f"[RESPONSE] {request.url.path} -> {decoded}")
+        except Exception as e:
+            print(f"[RESPONSE] {request.url.path} -> <Failed to decode body: {e}>")
+
+        # Return a new Response with the original content (because body_iterator is now consumed)
+        return Response(content=response_body, status_code=response.status_code, headers=dict(response.headers), media_type=response.media_type)
 
 
 ## Define API prefix based on environment
@@ -35,6 +60,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+## Add custom middleware for logging responses
+app.add_middleware(LogResponseMiddleware)
 
 # Include routers
 app.include_router(assessmentRoutes.router, prefix=prefix + "/assessment", tags=["assessment"])

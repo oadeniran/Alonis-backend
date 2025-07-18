@@ -3,6 +3,7 @@ from core.userActions import add_recommendations, confirm_to_add_more_alonis_rec
 from core.recommendations import get_alonis_recommendations
 import asyncio
 from datetime import datetime
+import traceback as tb
 def serialize_dict_to_text(data: dict, indent: int = 0) -> str:
     lines = []
     prefix = " " * indent
@@ -40,7 +41,7 @@ async def init_user_embeddings(user_data: str):
     user_id = user_data.get('uid', 'default_user')
 
     # Create embeddings for the user
-    await asyncio.to_thread(create_embeddings_for_user, docs, user_id)
+    await create_embeddings_for_user(docs, user_id)
 
 async def update_user_embeddings(data, user_id: str, meta_data = {}, session_id = "", title = "Context Data"):
     """
@@ -62,7 +63,7 @@ async def update_user_embeddings(data, user_id: str, meta_data = {}, session_id 
     docs = await asyncio.to_thread(create_docs, context, session_id)
 
     # Update embeddings for the user
-    await asyncio.to_thread(update_embeddings_for_user, docs, user_id)
+    await update_embeddings_for_user(docs, user_id)
 
 async def generate_alonis_recommendations(user_id: str):
     """
@@ -71,7 +72,7 @@ async def generate_alonis_recommendations(user_id: str):
 
     if confirm_to_add_more_alonis_recommendations(user_id, 'alonis_recommendation'):
         # Call the function to get Alonis recommendations
-        recommendations = await asyncio.to_thread(get_alonis_recommendations, user_id)
+        recommendations = await get_alonis_recommendations(user_id)
 
         if recommendations:
             # Add the recommendations to the database
@@ -158,3 +159,4 @@ async def run_sequenced_user_login_tasks(uid: str, username: str):
 
     except Exception as e:
         print(f"Error running sequenced tasks for user {uid}: {e}")
+        print(tb.format_exc())

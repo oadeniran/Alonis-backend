@@ -256,7 +256,7 @@ def build_context_for_user(uid):
     # Add the user Notes and Goals to the context
     user_notes_and_goals = get_user_notes_and_goals(uid)
     if user_notes_and_goals:
-        for note_or_goal in user_notes_and_goals:
+        for note_or_goal in user_notes_and_goals.get("notes_and_goals", []):
             if note_or_goal.get("is_goal", False) == True:
                 context[f'A goal provided_by user titled {note_or_goal["title"]}'] = {
                     "content": note_or_goal["title"] + " : " + 'Created on' + note_or_goal['date'] + note_or_goal["details"] + "\n" + ("Achieved" if note_or_goal.get("is_achieved", False) else "Not Achieved"),
@@ -371,6 +371,34 @@ def get_previous_quote(uid):
 
     return prev_user_quote if prev_user_quote else {"message": "No previous quote found"}
 
+def get_previous_quotes(uid, limit=10):
+    if not uid:
+        return {"error": "Please sign up/login to continue"}
+
+    try:
+        # Query all quotes before today, sorted by date descending, limited to 10
+        previous_quotes_cursor = dailyQuotesCollection.find(
+            {
+                'uid': uid,
+                'date': {"$lt": datetime.now().strftime("%Y-%m-%d")}
+            },
+            {
+                "_id": 0  # Exclude the _id field
+            }
+        ).sort("date", -1).limit(limit)
+
+        quotes = list(previous_quotes_cursor)
+
+        if quotes:
+            return {"quotes": quotes, "count": len(quotes)}
+        else:
+            return {"message": "No previous quotes found", "quotes": []}
+
+    except Exception as e:
+        print(f"Error retrieving previous quotes: {e}")
+        return {"error": "Something went wrong retrieving previous quotes"}
+
+
 def add_recommendations(uid, recommendations, rec_type='alonis_recommendation'):
     if not uid or uid == "":
         return {"error": "Please sign up/login to continue"}
@@ -379,21 +407,24 @@ def add_recommendations(uid, recommendations, rec_type='alonis_recommendation'):
         return {"error": "Recommendations must be a list"}
     
     ACTIONS_DICT = {
-        'alonis_recommendation': {},
+        'alonis_recommendation': None,
         'alonis_recommendation_movies': {"name" : "Watched this movie", "status": False},
         'alonis_recommendation_songs': {"name" : "Listened to this song", "status": False},
         'alonis_recommendation_books': {"name" : "Read this book", "status": False},
-        'alonis_recommendation_news': {}
+        'alonis_recommendation_news': None
     }
     
     recommendations_to_insert = [
-            {
-                **new_recommendation, "uid": uid, "date": datetime.now(), 'type': rec_type,
-                'is_read_by_user': False, # Default value for is_read_by_user
-                'action': ACTIONS_DICT.get(rec_type, {})
-            }  
-            for new_recommendation in recommendations
-        ]
+    {
+        **new_recommendation,
+        "uid": uid,
+        "date": datetime.now(),
+        "type": rec_type,
+        "is_read_by_user": False,
+        **({"action": action} if (action := ACTIONS_DICT.get(rec_type)) is not None else {})
+    }
+    for new_recommendation in recommendations
+    ]
     
     try:
         recommendationsCollection.insert_many(recommendations_to_insert)
@@ -420,7 +451,9 @@ def get_current_alonis_recommendations(uid, rec_type='alonis_recommendation', pa
 
         if page is not None:
             limit = RECOMMENDATIONS_PER_PAGE * int(page)
+            skip = (page - 1) * RECOMMENDATIONS_PER_PAGE
             cursor = cursor.limit(limit)
+            cursor = cursor.skip(skip)
 
         recommendations = list(cursor)
 
@@ -436,7 +469,7 @@ def get_current_alonis_recommendations(uid, rec_type='alonis_recommendation', pa
             "recommendations": recommendations,
             "count": len(recommendations),
             "page": page,
-            'has_next_page': (page is not None and (20 * int(page)) < total_recommendations),
+            'has_next_page': (page is not None and (RECOMMENDATIONS_PER_PAGE * int(page)) < total_recommendations),
             "status_code": 200
         }
 
@@ -451,13 +484,13 @@ def confirm_to_add_more_alonis_recommendations(uid, rec_type='alonis_recommendat
     """
 
     try:
-        current_alonis_recs = recommendationsCollection.find({"uid": uid, 'type': rec_type, 'is_read_by_user': True})
+        current_alonis_recs = recommendationsCollection.count_documents({"uid": uid, 'type': rec_type, 'is_read_by_user': True})
         total_alonis_recs = recommendationsCollection.count_documents({"uid": uid, 'type': rec_type})
         
         if total_alonis_recs == 0:
             return True  # No recommendations to check against
         
-        read_ratio = current_alonis_recs.count() / total_alonis_recs
+        read_ratio = current_alonis_recs / total_alonis_recs
         
         return read_ratio > 0.6
     except Exception as e:
