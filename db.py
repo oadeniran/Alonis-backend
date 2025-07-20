@@ -19,5 +19,6 @@ notes_and_goalsCollection = db["notes_and_goals"]
 dailyQuotesCollection = db['dailyQuotes']
 recommendationsCollection = db['recommendations']
 qlooRecommendationsPageTrackingCollection = db['qlooRecommendationsPageTracking']
+dailyStoriesCollection = db['dailyStories']
 
 # Define DB actions

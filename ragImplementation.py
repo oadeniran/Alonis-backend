@@ -36,7 +36,7 @@ def create_docs(context, curr_session_id):
         context = { "Text Context" : {"content": context, "metadata": {}} }
     for title, context_details in context.get('context', {}).items():
         print("Creating document for title:", title)
-        print("Context details:", context_details)
+        #print("Context details:", context_details)
         meta_data = context_details.get("metadata", {})
         meta_data["curr_session_id"] = curr_session_id
         doc = Document(
@@ -230,6 +230,12 @@ def load_model(retriever, chat_history=[], flow={}):
     elif flow.get('name', '') == 'recommendation_context_flow':
         print("Loading model for recommendation context flow")
         system_prompt = model_prompts.RECOMMENDATION_CONTEXT_MODEL_PROMPT + '\n' + flow.get('context', '')
+        model_contexts = [
+            ("system", system_prompt)
+        ]
+    elif flow.get('name', '') == 'daily_story_flow':
+        print("Loading model for story flow")
+        system_prompt = model_prompts.DAILY_STORY_MODEL_PROMPT + '\n' + flow.get('context', '')
         model_contexts = [
             ("system", system_prompt)
         ]

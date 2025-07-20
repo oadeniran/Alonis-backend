@@ -57,3 +57,30 @@ async def get_personalized_quote(uid: str):
     userActions.add_daily_quote(uid, quote['quote'])
     
     return quote
+
+async def get_daily_story(uid: str):
+    if not uid or uid == "":
+        return {"error": "Please sign up/login to continue"}
+    
+    user_story = userActions.get_user_story_for_today(uid)
+
+    if user_story and user_story.get('date', '') == datetime.now().strftime('%Y-%m-%d'):
+        user_story.pop('_id', None)  # Remove MongoDB ObjectId if present
+        return  user_story
+    
+    # If no story for today, generate a new one
+    previous_stories = userActions.get_previous_stories(uid)
+    if previous_stories.get('count', 0) > 0:
+        previous_stories_list = [utils.dict_to_string(prev_story) for prev_story in previous_stories.get('stories', [])]
+        previous_stories_text = "\n".join(previous_stories_list)
+    else:
+        previous_stories_text = "No previous stories available."
+
+    story = await talksSessions.giveMeAStory(uid, previous_stories_text)
+    if not story:
+        return {"error": "No stories available at the moment"}
+
+    # Add the story to the database for the user
+    userActions.add_daily_story(uid, story.get('story'))
+    
+    return story

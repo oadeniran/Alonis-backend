@@ -62,6 +62,8 @@ async def update_user_embeddings(data, user_id: str, meta_data = {}, session_id 
     # Update embeddings for the user
     await update_embeddings_for_user(docs, user_id)
 
+    await generate_alonis_recommendations_for_user(user_id)
+
 async def generate_alonis_recommendations(user_id: str):
     """
     Generate personalized Alonis recommendations for a user.

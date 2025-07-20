@@ -165,6 +165,20 @@ async def mark_interaction_with_recommendation(uid: str, rec_id: str):
     """
     return await userActions.mark_interaction_with_recommendation(uid, rec_id)
 
+@router.post("/{uid}/mark-recommendation-as-completed/{rec_id}")
+async def mark_recommendation_as_completed(uid: str, rec_id: str):
+    """
+    Endpoint to mark a recommendation as completed for a user.
+    
+    Args:
+        uid (str): User ID.
+        rec_id (str): Recommendation ID to be marked as completed.
+    
+    Returns:
+        dict: A dictionary containing a success message or an error message.
+    """
+    return await userActions.mark_recommendation_as_completed(uid, rec_id)
+
 @router.get("/{uid}/initiate-user-recommendations")
 async def initiate_user_recommendations(uid: str):
     """

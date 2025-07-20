@@ -30,3 +30,15 @@ async def personalized_quote(uid: str):
         JSON response containing a personalized quote.
     """
     return await talk.get_personalized_quote(uid)
+
+@router.get("/{uid}/daily-story")
+async def daily_story(uid: str):
+    """
+    Endpoint to retrieve a daily story for a user.
+    
+    Args:
+        uid (str): User ID.
+    Returns:
+        JSON response containing a daily story.
+    """
+    return await talk.get_daily_story(uid)

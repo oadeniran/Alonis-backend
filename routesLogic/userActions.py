@@ -189,6 +189,28 @@ async def mark_interaction_with_recommendation(uid: str, rec_id: str):
     
     return resp
 
+async def mark_recommendation_as_completed(uid, rec_id):
+    if not uid or uid == "":
+        return {"error": "Please sign up/login to continue"}
+    
+    if not rec_id or rec_id == "":
+        return {"error": "Recommendation ID is required"}
+    
+    resp = userActions.mark_recommendation_as_completed(uid, rec_id)
+
+    if resp["status_code"] != 200:
+        return {"error": resp.get("message")}
+    
+    asyncio.create_task(background_tasks.update_user_embeddings(
+        {'good thing to note': 'user completed a recommendation',
+         'recommendation details': resp.get('result', {})},
+        uid,
+        meta_data={"rec_completed": datetime.now().isoformat()},
+        title=f"User Completed Recommendation titlled : {resp.get('result', {}).get('title', 'Unknown')}"
+    ))
+    
+    return resp
+
 async def initiate_user_recommendations(uid):
     if not uid or uid == "":
         return {"error": "Please sign up/login to continue"}

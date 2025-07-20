@@ -34,12 +34,10 @@ def create_retriever(context_docs):
 async def load_retriever(uid):
     return await rag.load_user_retriever(uid)
 
-def load_model(retriever, uid, session_id, quote_flow=False, previous_quotes=None):
-    if quote_flow:
-        return rag.load_model(retriever, [], flow = {'name': 'quote_flow', 
-                                                     'context' : f""" The past 10 previous quote seen by user are: 
-                                                        {previous_quotes if previous_quotes else "No previous quotes available."}
-                                                    """})
+def load_model(retriever, uid, session_id,flow_name = None, flow_context = None):
+    if flow_name is not None and flow_context is not None:
+        return rag.load_model(retriever, [], flow = {'name': flow_name, 
+                                                     'context' : flow_context,})
     else:
         # If not in quote flow, we can use the chat history for the session
         return rag.load_model(retriever, get_chat_history_for_ai(uid, session_id))
@@ -67,6 +65,18 @@ def getQuote(model, uid):
         "uid": uid
     }
 
+def getStory(model, uid):
+    response = model.invoke({'input': "Give me a unique personalized story for today"})
+    story_text = response["answer"]
+
+    story = story_text.strip()
+
+    print("Story generated:", story)
+    return {
+        "story": story,
+        "uid": uid
+    }
+
 async def talkToMe(uid, session_id, message, context_doc_list= None):
     if context_doc_list is not None:
         retriever = create_retriever(context_doc_list)
@@ -78,7 +88,14 @@ async def talkToMe(uid, session_id, message, context_doc_list= None):
 
 async def giveMeAQuoute(uid, previous_quotes=None):
     retriever = await load_retriever(uid)
-    model = load_model(retriever, uid, None, quote_flow=True, previous_quotes=previous_quotes)
+    model = load_model(retriever, uid, None, flow_name='quote_flow', flow_context = f""" The past 10 previous quote seen by user are: 
+                                                        {previous_quotes if previous_quotes else "No previous quotes available."}
+                                                    """)
     return getQuote(model, uid)
 
-    
+async def giveMeAStory(uid, previous_stories_text):
+    retriever = await load_retriever(uid)
+    model = load_model(retriever, uid, None, flow_name='story_flow', flow_context=f""" The past 10 previous stories seen by user are: 
+                                                        {previous_stories_text if previous_stories_text else "No previous stories available."}
+                                                    """)
+    return getStory(model, uid)

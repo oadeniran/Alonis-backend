@@ -1,4 +1,4 @@
-from db import usersCollection, reportsCollection, sessionsCollection, dailyQuotesCollection, extractedDataCollection, recommendationsCollection, qlooRecommendationsPageTrackingCollection, BulkWriteError
+from db import usersCollection, reportsCollection, sessionsCollection, dailyQuotesCollection, extractedDataCollection, recommendationsCollection, qlooRecommendationsPageTrackingCollection, dailyStoriesCollection, BulkWriteError
 from bson import ObjectId
 import bcrypt
 from datetime import datetime
@@ -355,6 +355,23 @@ def add_daily_quote(uid, quote):
     
     return {"message": "Quote added successfully", "status_code": 200}
 
+def add_daily_story(uid, story):
+    if not uid or uid == "":
+        return {"error": "Please sign up/login to continue"}
+    
+    if not story or story == "":
+        return {"error": "Story is required"}
+    
+    today = datetime.now().strftime("%Y-%m-%d")
+    
+    dailyStoriesCollection.update_one(
+        {"uid": uid, "date": today},
+        {"$set": {"story": story}},
+        upsert=True
+    )
+    
+    return {"message": "Story added successfully", "status_code": 200}
+
 def get_user_quote_for_today(uid):
 
     user_quote_for_day = dailyQuotesCollection.find_one({
@@ -363,6 +380,14 @@ def get_user_quote_for_today(uid):
     })
 
     return user_quote_for_day
+
+def get_user_story_for_today(uid):
+    user_story_for_day = dailyStoriesCollection.find_one({
+        'uid': uid,
+        'date' : datetime.now().strftime( "%Y-%m-%d")
+    })
+
+    return user_story_for_day
 
 def get_previous_quote(uid):
     if not uid or uid == "":
@@ -401,6 +426,33 @@ def get_previous_quotes(uid, limit=10):
     except Exception as e:
         print(f"Error retrieving previous quotes: {e}")
         return {"error": "Something went wrong retrieving previous quotes"}
+
+def get_previous_stories(uid, limit=10):
+    if not uid:
+        return {"error": "Please sign up/login to continue"}
+
+    try:
+        # Query all stories before today, sorted by date descending, limited to 10
+        previous_stories_cursor = dailyStoriesCollection.find(
+            {
+                'uid': uid,
+                'date': {"$lt": datetime.now().strftime("%Y-%m-%d")}
+            },
+            {
+                "_id": 0  # Exclude the _id field
+            }
+        ).sort("date", -1).limit(limit)
+
+        stories = list(previous_stories_cursor)
+
+        if stories:
+            return {"stories": stories, "count": len(stories)}
+        else:
+            return {"message": "No previous stories found", "stories": []}
+
+    except Exception as e:
+        print(f"Error retrieving previous stories: {e}")
+        return {"error": "Something went wrong retrieving previous stories"}
 
 
 def add_recommendations(uid, recommendations, rec_type='alonis_recommendation'):
@@ -453,8 +505,15 @@ def get_current_alonis_recommendations(uid, rec_type='alonis_recommendation', pa
         dict: Recommendations and status.
     """
     try:
-        query = {"uid": uid, "type": rec_type}
-        cursor = recommendationsCollection.find(query).sort([("date", -1), ("_id", -1)])  # Sort by date and then by _id in descending order
+        query = {
+            "uid": uid,
+            "type": rec_type,
+            "$or": [
+                {"action": {"$exists": False}},                      # No action field
+                {"action.status": {"$ne": True}}                    # action exists, but status is not True
+            ]
+        }
+        cursor = recommendationsCollection.find(query).sort([("is_read_by_user", 1), ("date", -1), ("_id", -1)])  # Sort by date and then by _id in descending order
 
         if page is not None:
             skip = (page - 1) * RECOMMENDATIONS_PER_PAGE
@@ -487,21 +546,30 @@ def get_current_alonis_recommendations(uid, rec_type='alonis_recommendation', pa
         return 
             
 def confirm_to_add_more_alonis_recommendations(uid, rec_type='alonis_recommendation'):
-    """
-    Confirm to add more Alonis recommendations for the user.
-    This function returns true is the number of recommdendation with type 'rec_type' that has 'is_read_by_user' set to True is greater than 0.6 of the total recommendations of type 'rec_type'.
-    """
-
     try:
-        current_alonis_recs = recommendationsCollection.count_documents({"uid": uid, 'type': rec_type, 'is_read_by_user': True})
-        total_alonis_recs = recommendationsCollection.count_documents({"uid": uid, 'type': rec_type})
+        match_query = {"uid": uid, "type": rec_type}
+
+        total = recommendationsCollection.count_documents(match_query)
+        read = recommendationsCollection.count_documents({**match_query, "is_read_by_user": True})
         
-        if total_alonis_recs == 0:
-            return True  # No recommendations to check against
+        if total > 0 and (read / total) > 0.6:
+            return True
+
+        # Aggregate to count how many recs have at least one action.status == True
+        pipeline = [
+            {"$match": {**match_query, "actions.status": True}},
+            {"$count": "count_with_true_actions"}
+        ]
+        result = list(recommendationsCollection.aggregate(pipeline))
+        count_with_true_actions = result[0]["count_with_true_actions"] if result else 0
+
+        total_with_actions = recommendationsCollection.count_documents({**match_query, "actions": {"$exists": True, "$ne": []}})
         
-        read_ratio = current_alonis_recs / total_alonis_recs
-        
-        return read_ratio > 0.6
+        if total_with_actions > 0 and (count_with_true_actions / total_with_actions) > 0.6:
+            return True
+
+        return False
+
     except Exception as e:
         print(f"Error confirming recommendations: {e}")
         return False
@@ -533,7 +601,34 @@ def mark_interaction_with_recommendation(uid, rec_id):
         print(f"Error marking interaction: {e}")
         return {"error": "Error marking interaction", "status_code": 400}
 
-def get_user_page_for_qloo_recommendations(uid, rec_type= 'alonis_recommendation_movies'):
+def mark_recommendation_as_completed(uid, rec_id):
+    """
+    Mark a recommendation as completed for a user.
+    
+    Args:
+        uid (str): User ID.
+        rec_id (str): Recommendation ID.
+        
+    Returns:
+        dict: Success or error message.
+    """
+    try:
+        result = recommendationsCollection.find_one_and_update(
+            {"uid": uid, "_id": ObjectId(rec_id)},
+            {"$set": {"action.status": True}},
+            return_document=True
+        )
+        
+        if result:
+            del result['_id']  # Remove the ObjectId for JSON serialization
+            return {"message": "Recommendation marked as completed", "status_code": 200, "result": result}
+        else:
+            return {"error": "Recommendation not found", "status_code": 404}
+    except Exception as e:
+        print(f"Error marking recommendation as completed: {e}")
+        return {"error": "Error marking recommendation as completed", "status_code": 400}
+
+def get_user_page_for_qloo_recommendations(uid):
     """
     Get the page number for Qloo recommendations for a user.
     
