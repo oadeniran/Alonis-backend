@@ -11,7 +11,7 @@ on:
 jobs:
     Containerize-job:
         runs-on: ubuntu-latest
-        if: false # contains(github.event.head_commit.message, 'no-deploy') == false # check if "no-deploy" is in the commit message
+        if: contains(github.event.head_commit.message, 'no-deploy') == false # check if "no-deploy" is in the commit message
         outputs:
             repo_owner_lower: ${{ steps.lowercase.outputs.repo_owner_lower }}
         steps:
@@ -53,6 +53,6 @@ jobs:
         - name: Deploy to web app
           uses: azure/webapps-deploy@v2
           with:
-            app-name: 'alonis-backend'
+            app-name: 'alonis'
             package: '.'
             images: 'ghcr.io/${{ needs.Containerize-job.outputs.repo_owner_lower }}/alonis-be:v1-${{ github.sha }}'
