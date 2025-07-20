@@ -28,3 +28,4 @@ uuid
 streamlit_chat
 bcrypt
 langchain-chroma
+beautifulsoup4

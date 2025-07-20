@@ -86,7 +86,7 @@ def get_user_notes_and_goals(uid, page: int = 1):
             .find({"uid": uid, 'is_archived': False})
             .sort("date", -1)
             .skip(skip)
-            .limit(page * per_page)  # Custom rule: 12 * page
+            .limit(per_page)  # Custom rule: 12 * page
         )
 
         total = notes_and_goalsCollection.count_documents({"uid": uid, 'is_archived': False})

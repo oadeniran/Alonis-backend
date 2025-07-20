@@ -132,7 +132,8 @@ async def delete_note_or_goal(uid: str, note_id: str):
 @router.get("/{uid}/alonis-recommendations/{rec_type}")
 async def get_alonis_recommendations(
     uid: str,
-    rec_type: Literal['alonis_recommendation', 'alonis_recommendation_movies', 'alonis_recommendation_songs'] = 'alonis_recommendation',
+    rec_type: Literal['alonis_recommendation', 'alonis_recommendation_movies', 'alonis_recommendation_songs', 
+                      'alonis_recommendation_books', 'alonis_recommendation_news'] = 'alonis_recommendation',
     page: int = None
 ):
     """
@@ -145,6 +146,9 @@ async def get_alonis_recommendations(
     Returns:
         dict: A dictionary containing the recommendations or an error message.
     """
+    if not uid or uid == "":
+        return {"error": "Please sign up/login to continue"}
+    
     return await userActions.get_alonis_recommendations(uid, rec_type, page)
 
 @router.post("/{uid}/mark-interaction-with-recommendation/{rec_id}")
@@ -160,3 +164,16 @@ async def mark_interaction_with_recommendation(uid: str, rec_id: str):
         dict: A dictionary containing a success message or an error message.
     """
     return await userActions.mark_interaction_with_recommendation(uid, rec_id)
+
+@router.get("/{uid}/initiate-user-recommendations")
+async def initiate_user_recommendations(uid: str):
+    """
+    Endpoint to initiate user recommendations for a user.
+    
+    Args:
+        uid (str): User ID.
+    
+    Returns:
+        dict: A dictionary containing a success message or an error message.
+    """
+    return await userActions.initiate_user_recommendations(uid)

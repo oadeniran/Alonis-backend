@@ -15,15 +15,17 @@ class LogResponseMiddleware(BaseHTTPMiddleware):
         async for chunk in response.body_iterator:
             response_body += chunk
 
-        try:
-            decoded = response_body.decode()
-            if decoded.startswith('{') or decoded.startswith('['):
-                parsed = json.loads(decoded)
-                print(f"[RESPONSE] {request.url.path} ->", json.dumps(parsed, indent=2))
-            else:
-                print(f"[RESPONSE] {request.url.path} -> {decoded}")
-        except Exception as e:
-            print(f"[RESPONSE] {request.url.path} -> <Failed to decode body: {e}>")
+        
+        # # Use this to skip and reove when needed 
+        # try:
+        #     decoded = response_body.decode()
+        #     if decoded.startswith('{') or decoded.startswith('['):
+        #         parsed = json.loads(decoded)
+        #         print(f"[RESPONSE] {request.url.path} ->", json.dumps(parsed, indent=2))
+        #     else:
+        #         print(f"[RESPONSE] {request.url.path} -> {decoded}")
+        # except Exception as e:
+        #     print(f"[RESPONSE] {request.url.path} -> <Failed to decode body: {e}>")
 
         # Return a new Response with the original content (because body_iterator is now consumed)
         return Response(content=response_body, status_code=response.status_code, headers=dict(response.headers), media_type=response.media_type)

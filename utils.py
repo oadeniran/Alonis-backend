@@ -118,34 +118,46 @@ def clean_and_parse_list_json(input_string):
             print(f"Still ran into error and the error is Error decoding JSON: {e}")
     return None, cleaned_string, f"Still ran into error and the error is Error decoding JSON: {e}"
 
-def dict_to_string(d, explanations=None):
-    #i = 1
+# Another exists in backgroundTasks.py for serilizing the jdon data to string
+def dict_to_string(d, explanations=None, indent=0, normalize_text=False):
+    def normalize(s):
+        return s.replace('_', ' ').title() if normalize_text else s
+
     result = []
+    prefix = " " * indent
+
     if explanations and len(explanations) > 0:
         for key, value in d.items():
+            key_display = normalize(key)
             if isinstance(value, dict):
-                value_str = ', '.join(f'{k}: {v}' for k, v in value.items())
-                result.append(f'{key}: {explanations[key]}: value(numeric) can be {value_str}')
+                value_str = ', '.join(f'{normalize(k)}: {v}' for k, v in value.items())
+                result.append(f'{prefix}{key_display}: {explanations.get(key, "")}: value(numeric) can be {value_str}')
             elif isinstance(value, range):
                 value_str = f'{value.start} to {value.stop - 1}'
-                result.append(f'{key}: {explanations[key]}: score user with a numeric value between {value_str}')
+                result.append(f'{prefix}{key_display}: {explanations.get(key, "")}: score user with a numeric value between {value_str}')
             else:
-                result.append(f'{key}: {value}')
-        
-        #i+=1
+                result.append(f'{prefix}{key_display}: {value}')
     else:
         for key, value in d.items():
+            key_display = normalize(key)
             if isinstance(value, dict):
-                value_str = ', '.join(f'{k}: {v}' for k, v in value.items())
-                result.append(f'{key}: {value_str}')
+                result.append(f'{prefix}{key_display}:')
+                result.append(dict_to_string(value, explanations=None, indent=indent + 2, normalize_text=normalize_text))
+            elif isinstance(value, list):
+                result.append(f'{prefix}{key_display}:')
+                for item in value:
+                    if isinstance(item, dict):
+                        result.append(dict_to_string(item, explanations=None, indent=indent + 2, normalize_text=normalize_text))
+                    else:
+                        item_display = normalize(item) if isinstance(item, str) else item
+                        result.append(f'{" " * (indent + 2)}- {item_display}')
             elif isinstance(value, range):
                 value_str = f'{value.start} to {value.stop - 1}'
-                result.append(f'{key}: {value_str}')
+                result.append(f'{prefix}{key_display}: {value_str}')
             else:
-                result.append(f'{key}: {value}')
-            
-            #i+=1
-
+                value_display = normalize(value) if isinstance(value, str) else value
+                result.append(f'{prefix}{key_display}: {value_display}')
+                
     return '\n'.join(result)
 
 def remove_stage_from_message(message):

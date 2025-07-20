@@ -1,9 +1,11 @@
-from db import usersCollection, reportsCollection, sessionsCollection, dailyQuotesCollection, extractedDataCollection, recommendationsCollection
+from db import usersCollection, reportsCollection, sessionsCollection, dailyQuotesCollection, extractedDataCollection, recommendationsCollection, qlooRecommendationsPageTrackingCollection, BulkWriteError
 from bson import ObjectId
 import bcrypt
 from datetime import datetime
 from core.notesActions import get_user_notes_and_goals, add_notes, set_goal_as_achieved, mark_note_as_archived
 from config import RECOMMENDATIONS_PER_PAGE
+import random
+
 
 def encrypt_password(password):
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
@@ -62,7 +64,9 @@ def login(login_det):
                     "username" : details["username"],
                     "email" : details["email"],
                     "alonis_verbosity" : details["alonis_verbosity"],
-                    "short_bio" : details["short_bio"]}
+                    "short_bio" : details["short_bio"],
+                    "login_count": details.get("login_count", 0) + 1
+                    }
         else:
             return {
             "message" : "Wrong Password",
@@ -427,8 +431,11 @@ def add_recommendations(uid, recommendations, rec_type='alonis_recommendation'):
     ]
     
     try:
-        recommendationsCollection.insert_many(recommendations_to_insert)
+        recommendationsCollection.insert_many(recommendations_to_insert, ordered=False)
         return {"message": "Recommendations added successfully", "status_code": 200}
+    except BulkWriteError as bwe:
+        # Handle duplicate key errors or other bulk write errors
+        print(f"Bulk write error: {bwe.details}")
     except Exception as e:
         print(e)
         return {"error": "Error adding recommendations", "status_code": 400}
@@ -447,13 +454,12 @@ def get_current_alonis_recommendations(uid, rec_type='alonis_recommendation', pa
     """
     try:
         query = {"uid": uid, "type": rec_type}
-        cursor = recommendationsCollection.find(query).sort("date", -1)
+        cursor = recommendationsCollection.find(query).sort([("date", -1), ("_id", -1)])  # Sort by date and then by _id in descending order
 
         if page is not None:
-            limit = RECOMMENDATIONS_PER_PAGE * int(page)
             skip = (page - 1) * RECOMMENDATIONS_PER_PAGE
-            cursor = cursor.limit(limit)
             cursor = cursor.skip(skip)
+            cursor = cursor.limit(RECOMMENDATIONS_PER_PAGE)
 
         recommendations = list(cursor)
 
@@ -463,10 +469,13 @@ def get_current_alonis_recommendations(uid, rec_type='alonis_recommendation', pa
             if 'date' in rec:
                 rec['date'] = rec['date'].strftime("%Y-%m-%d %H:%M:%S")
         
+        # # Shuffle the recommendations to provide a varied experience
+        # random.shuffle(recommendations)
+        
         total_recommendations = recommendationsCollection.count_documents(query)
 
         return {
-            "recommendations": recommendations,
+            "recommendations": [{k:v for k, v in recommendation.items() if k != 'tags_original'} for recommendation in recommendations],
             "count": len(recommendations),
             "page": page,
             'has_next_page': (page is not None and (RECOMMENDATIONS_PER_PAGE * int(page)) < total_recommendations),
@@ -523,3 +532,48 @@ def mark_interaction_with_recommendation(uid, rec_id):
     except Exception as e:
         print(f"Error marking interaction: {e}")
         return {"error": "Error marking interaction", "status_code": 400}
+
+def get_user_page_for_qloo_recommendations(uid, rec_type= 'alonis_recommendation_movies'):
+    """
+    Get the page number for Qloo recommendations for a user.
+    
+    Args:
+        uid (str): User ID.
+        rec_type (str): Type of recommendation.
+        
+    Returns:
+        dict: Page number
+    """
+    try:
+        page_tracking = qlooRecommendationsPageTrackingCollection.find_one({"uid": uid})
+        
+        if page_tracking:
+            return page_tracking
+        else:
+            return {}
+    except Exception as e:
+        print(f"Error fetching Qloo recommendations page: {e}")
+        return {"error": "Error fetching Qloo recommendations page", "status_code": 400}
+
+def update_user_page_for_qloo_recommendations(uid, page_obj={}):
+    """
+    Update the page number for Qloo recommendations for a user.
+    
+    Args:
+        uid (str): User ID.
+        rec_type (str): Type of recommendation.
+        page (int): Page number to update.
+        
+    Returns:
+        dict: Success or error message.
+    """
+    try:
+        qlooRecommendationsPageTrackingCollection.update_one(
+            {"uid": uid},
+            {"$set": page_obj},
+            upsert=True
+        )
+        return {"message": "Page updated successfully", "status_code": 200}
+    except Exception as e:
+        print(f"Error updating Qloo recommendations page: {e}")
+        return {"error": "Error updating Qloo recommendations page", "status_code": 400}

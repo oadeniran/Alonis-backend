@@ -1,4 +1,5 @@
 from pymongo import MongoClient
+from pymongo.errors import BulkWriteError
 
 from config import DATABASE_URL 
 
@@ -17,5 +18,6 @@ sessionsCollection = db["sessions"]
 notes_and_goalsCollection = db["notes_and_goals"]
 dailyQuotesCollection = db['dailyQuotes']
 recommendationsCollection = db['recommendations']
+qlooRecommendationsPageTrackingCollection = db['qlooRecommendationsPageTracking']
 
 # Define DB actions

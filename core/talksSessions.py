@@ -36,7 +36,10 @@ async def load_retriever(uid):
 
 def load_model(retriever, uid, session_id, quote_flow=False, previous_quotes=None):
     if quote_flow:
-        return rag.load_model(retriever, [], quote_flow=True, previous_quotes=previous_quotes)
+        return rag.load_model(retriever, [], flow = {'name': 'quote_flow', 
+                                                     'context' : f""" The past 10 previous quote seen by user are: 
+                                                        {previous_quotes if previous_quotes else "No previous quotes available."}
+                                                    """})
     else:
         # If not in quote flow, we can use the chat history for the session
         return rag.load_model(retriever, get_chat_history_for_ai(uid, session_id))

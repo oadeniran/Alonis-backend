@@ -34,10 +34,11 @@ async def login_user(login_cred):
     
     resp = userActions.login(login_cred)
     if resp["status_code"] == 200:
-        # Start a background task to update user embeddings with login details
+        # Start a background task to update user embeddings with login details - pass the user login count also to be able to know if to start generating recommendations
         asyncio.create_task(background_tasks.run_sequenced_user_login_tasks(
             uid=resp.get("uid", "default_user"),
-            username=username 
+            username=username,
+            login_count=resp.get("login_count", 1)  # Default to 1 if not present
         ))
         return resp
     else:
@@ -159,8 +160,7 @@ async def get_alonis_recommendations(uid: str, rec_type = 'alonis_recommendation
     
     recommendations = None
     
-    if rec_type == 'alonis_recommendation':
-        recommendations = userActions.get_current_alonis_recommendations(uid, rec_type=rec_type, page = page)
+    recommendations = userActions.get_current_alonis_recommendations(uid, rec_type=rec_type, page = page)
 
     if not recommendations:
         return {"error": "No Alonis recommendations found for this user"}
@@ -177,7 +177,7 @@ async def mark_interaction_with_recommendation(uid: str, rec_id: str):
     resp = userActions.mark_interaction_with_recommendation(uid, rec_id)
 
     if resp["status_code"] != 200:
-        return {"error": resp["message"]}
+        return {"error": resp.get("message")}
     print(resp)
     asyncio.create_task(background_tasks.update_user_embeddings(
         {'good thing to note': 'user interacted with a recommendation',
@@ -188,3 +188,11 @@ async def mark_interaction_with_recommendation(uid: str, rec_id: str):
     ))
     
     return resp
+
+async def initiate_user_recommendations(uid):
+    if not uid or uid == "":
+        return {"error": "Please sign up/login to continue"}
+    
+    asyncio.create_task(background_tasks.generate_alonis_recommendations_for_user(uid))
+    
+    return {"message": "User recommendations generation initiated", "status_code": 200}
