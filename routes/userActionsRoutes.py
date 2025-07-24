@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from routesLogic import userActions
 from typing import Literal
-from dtos.user_dto import UserDTO, UserLoginDTO
+from dtos.user_dto import UserDTO, UserLoginDTO, HackathonAuthDTO
 from dtos.notes_dto import Note_AND_GOAL
 
 router = APIRouter()
@@ -31,6 +31,22 @@ async def sign_in(login_cred: UserLoginDTO):
         dict: A dictionary containing a success message or an error message.
     """
     return await userActions.login_user(login_cred.model_dump())
+
+@router.post("/hackathon-username-only-auth")
+async def hackathon_username_only_auth(hackathon_auth_data: HackathonAuthDTO):
+    """
+    Endpoint for hackathon username-only authentication.
+    
+    Args:
+        username (str): Username of the user.
+        short_bio (str): Short bio of the user (optional).
+    
+    Returns:
+        dict: A dictionary containing a success message or an error message.
+    """
+    username = hackathon_auth_data.username
+    short_bio = hackathon_auth_data.short_bio or ""
+    return await userActions.hackathon_username_only_authentication(username, short_bio)
 
 @router.get("/{uid}/sessions")
 async def get_user_sessions(uid: str):

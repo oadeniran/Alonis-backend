@@ -44,6 +44,7 @@ def create_docs(context, curr_session_id):
             metadata=meta_data
         )
         docs.append(doc)
+    print("Created documents:", len(docs))
     return docs
 
 def _get_store(user_id: str):
@@ -124,6 +125,7 @@ async def create_embeddings_for_user(docs, user_id: str) -> str:
             persist_directory=os.path.join(EMBEDDINGS_DIR, user_id),
             embedding=EMBEDDING
         )
+    print(f"Created embeddings for user {user_id} with {len(splits)} documents.")
 
     # Upload the embeddings to Azure Blob Storage for backup and loading
     asyncio.create_task(upload_embeddings_to_azure(user_id))
@@ -131,22 +133,22 @@ async def create_embeddings_for_user(docs, user_id: str) -> str:
 
 async def update_embeddings_for_user(docs, user_id: str) -> str:
     """Append new docs to an existing user store (creates one if absent)."""
-    # use chroma_guard to ensure that no other process is trying to write to the same user's store at the same time
-    async with chroma_guard(user_id):
-        if not os.path.exists(os.path.join(EMBEDDINGS_DIR, user_id)):
-            # No store yet → Try loading from azure Blob Storage and if still not there then build context from user data
-            try:
+    if not os.path.exists(os.path.join(EMBEDDINGS_DIR, user_id)):
+        # No store yet → Try loading from azure Blob Storage and if still not there then build context from user data
+        try:
+            async with chroma_guard(user_id):
+                # Attempt to download and restore user embeddings
                 res = download_and_restore_user_embeddings(user_id)
-            except Exception as e:
-                print(f"Error restoring user embeddings for {user_id}: {e}")
-                res = None # If the file doesn't exist, then just create an empty store
-            if res is None:
-                # Create with context that is built from user data
-                user_context = build_context_for_user(user_id)
-                user_context_docs = create_docs(user_context, "")
-                await create_embeddings_for_user(user_context_docs, user_id)
+        except Exception as e:
+            print(f"Error restoring user embeddings for {user_id}: {e}")
+            res = None # If the file doesn't exist, then just create an empty store
+        if res is None:
+            # Create with context that is built from user data
+            user_context = build_context_for_user(user_id)
+            user_context_docs = create_docs(user_context, "")
+            await create_embeddings_for_user(user_context_docs, user_id)
 
-    
+    async with chroma_guard(user_id):
         store  = _get_store(user_id)
 
         splits = SPLITTER.split_documents(docs)
@@ -168,21 +170,21 @@ async def load_user_retriever(user_id: str):
     Returns:
         VectorStoreRetriever: A retriever instance ready to use.
     """
-    # use chroma_guard to ensure that no other process is trying to write to the same user's store at the same time
-    async with chroma_guard(user_id):
-        if not os.path.exists(os.path.join(EMBEDDINGS_DIR, user_id)):
-            # No store yet → Try loading from azure Blob Storage and if still not there then build context from user data
-            try:
+    if not os.path.exists(os.path.join(EMBEDDINGS_DIR, user_id)):
+        # No store yet → Try loading from azure Blob Storage and if still not there then build context from user data
+        try:
+            async with chroma_guard(user_id):
+                # Attempt to download and restore user embeddings
                 res = download_and_restore_user_embeddings(user_id)
-            except Exception as e:
-                res = None # If the file doesn't exist, then just create an empty store
-            if res is None:
-                # Create with context that is built from user data
-                user_context = build_context_for_user(user_id)
-                print("user_context===", user_context)
-                user_context_docs = create_docs(user_context, "")
-                await create_embeddings_for_user(user_context_docs, user_id)
-        
+        except Exception as e:
+            res = None # If the file doesn't exist, then just create an empty store
+        if res is None:
+            # Create with context that is built from user data
+            user_context = build_context_for_user(user_id)
+            print("user_context===", user_context)
+            user_context_docs = create_docs(user_context, "")
+            await create_embeddings_for_user(user_context_docs, user_id)
+    async with chroma_guard(user_id):
         # Load the store - since we are using chroma_guard, we can be sure that no other process is trying to write to the same user's store at the same time
         store = _get_store(user_id)
         return store.as_retriever()

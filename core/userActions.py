@@ -77,6 +77,63 @@ def login(login_det):
                     "status_code" : 404
                     }
 
+def hackathon_username_only_authentication(username, short_bio=""):
+    try:
+        details = usersCollection.find_one({"username": username})
+    except:
+        return {
+                    "message": "Error with DB",
+                    "status_code": 404
+                }
+    
+    if details:
+        # Treat this as login for hackathon auth
+        print(str(details["_id"]))
+        usersCollection.update_one({"_id": ObjectId(details["_id"])}, {"$inc": {"login_count": 1}})
+        return {
+            "message": "Hackathon auth successful",
+            "status_code": 200,
+            "uid": str(details["_id"]),
+            "username": details["username"],
+            "email": details.get("email", ""),
+            "alonis_verbosity": details.get("alonis_verbosity", "normal"),
+            "short_bio": details.get("short_bio", ""),
+            "login_count": details.get("login_count", 1)  # Default to 1 if not present
+        }
+    
+    user_details = {
+        "username": username,
+        "short_bio": short_bio,
+        "alonis_verbosity": "normal",  # Default verbosity level
+        "email": "",  # No email provided in this case
+        "password": encrypt_password("default_password"),  # Default password for hackathon auth
+        "login_count": 1,  # Initial login count
+        "is_hackathon_user": True  # Flag to indicate hackathon user
+    }
+    
+    try:
+        uid = usersCollection.insert_one(user_details)
+    except Exception as e:
+        print(e)
+        return {
+                    "message": "Error with signup",
+                    "status_code": 400
+                }
+    # Return the new user details
+    user_details['uid'] = str(uid.inserted_id)
+    
+    return {
+        "message": "Sign Up successful",
+        "uid": str(uid.inserted_id),
+        "username": username,
+        "email": "",
+        "alonis_verbosity": "normal",
+        "short_bio": short_bio,
+        "login_count": 1,
+        "status_code": 200,
+        'user_details': user_details
+    }
+
 def add_user_session(uid, session_id, session_type, session_info):
     try:
         #usersCollection.update_one({"_id":ObjectId(uid)}, {"$push": {"sessions": {"session_id": session_id, "session_type": session_type, "session_info": session_info}}})
@@ -208,6 +265,12 @@ def add_report_to_db(uid, session_type, session_id:str, report:str):
         {"$set": {"has_report": True}}
     )
 
+    # Update the user to increment the report count
+    usersCollection.find_one_and_update(
+        {"_id": ObjectId(uid)},
+        {"$inc": {"report_count": 1}}
+    )
+
 def update_report_save_status(uid, session_id:str):
     reportsCollection.find_one_and_update({"uid":uid, "session_id":session_id}, {"$set": {"saved": True}})
 
@@ -303,6 +366,13 @@ def add_note_or_goal_for_user(uid, note_details):
     
     resp = add_notes(uid, note_details)
 
+    # If the note/goal was added successfully, update note count by 1
+    if resp["status_code"] == 200:
+        usersCollection.find_one_and_update(
+            {"_id": ObjectId(uid)},
+            {"$inc": {"note_count": 1}}
+        )
+
     print(resp)
     
     if resp["status_code"] != 200:
@@ -319,6 +389,12 @@ def delete_note_or_goal(uid, note_id):
     
     try:
         result = mark_note_as_archived(uid, note_id)
+
+        # If the note/goal was archived successfully, update note count by -1
+        usersCollection.find_one_and_update(
+            {"_id": ObjectId(uid)},
+            {"$inc": {"note_count": -1}}
+        )
         return result   
     except Exception as e:
         print(e)
@@ -556,17 +632,33 @@ def confirm_to_add_more_alonis_recommendations(uid, rec_type='alonis_recommendat
             return True
 
         # Aggregate to count how many recs have at least one action.status == True
-        pipeline = [
-            {"$match": {**match_query, "actions.status": True}},
-            {"$count": "count_with_true_actions"}
-        ]
-        result = list(recommendationsCollection.aggregate(pipeline))
-        count_with_true_actions = result[0]["count_with_true_actions"] if result else 0
+        if total > 0:
+            pipeline = [
+                {"$match": {**match_query, "actions.status": True}},
+                {"$count": "count_with_true_actions"}
+            ]
+            result = list(recommendationsCollection.aggregate(pipeline))
+            count_with_true_actions = result[0]["count_with_true_actions"] if result else 0
 
-        total_with_actions = recommendationsCollection.count_documents({**match_query, "actions": {"$exists": True, "$ne": []}})
-        
-        if total_with_actions > 0 and (count_with_true_actions / total_with_actions) > 0.6:
-            return True
+            total_with_actions = recommendationsCollection.count_documents({**match_query, "actions": {"$exists": True, "$ne": []}})
+
+            
+            
+            if total_with_actions > 0 and (count_with_true_actions / total_with_actions) > 0.6:
+                return True
+        else:
+            # No recommendations found, so we can add more depending on
+            # Add user logic to determine if more recommendations should be added
+            # If user has at least one report or note or talk session with more than 6 messages, we can add more recommendations
+            user_data = usersCollection.find_one({"_id": ObjectId(uid)})
+            if user_data:
+                has_report = reportsCollection.count_documents({"uid": uid}) > 0
+                has_note = usersCollection.find_one({"_id": ObjectId(uid), "note_count": {"$gt": 0}}) is not None
+                has_session_with_messages = sessionsCollection.count_documents({"uid": uid, 'session_type' : 'talk_session', "message_count": {"$gt": 6}}) > 0
+                
+                if has_report or has_note or has_session_with_messages:
+                    return True
+
 
         return False
 

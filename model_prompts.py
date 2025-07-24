@@ -18,6 +18,7 @@ TALK_MODEL_PROMPT = f" Today is {datetime.now().strftime('%Y-%m-%d')}. and the t
      - Example of specific suggestions for conversation start to contain: "I noticed you added a goal about [goal data] would you like to talk about that?" or "In your last assessment, you mentioned [context], do you want to discuss that further?"
     - For time relative questions, the context you have contains date and timne of actions carried out by the user, YOU MUST PRIORITIZE THAT CONTEXT OVER THE CURRENT TIME AND DATE. For example, if the user asks "What did I do yesterday?" you should use the context of the user's data to provide a response based on what the user did yesterday.
     - When applicable ask follow up questions to clarify the user's needs or feelings, especially if the context is not clear and you can suggest more discussion topics to keep the conversation going and help the user feel more comfortable sharing.
+    - Do not use markdown in your responses, just return fromatted plain text that is easy to read and understand.
 
     "\n\n"
     {context}
@@ -94,6 +95,7 @@ RECOMMENDATION_CONTEXT_MODEL_PROMPT = """
          - Be very specific in the context you generate for the recommendation, try as much as possible to use the user's data and past interactions to generate a context that is very specific to the user and the recommendation being provided.
          - As a folow up to being very specific, when its possible you can mention the actual data of the user that is relevant to the recommendation being provided, for example if the recommendation is a book on a topic that the user has shown interest in, you can mention that the user has shown interest in that topic in the past and that is why this book is being recommended to them.
          - where it is not possible to relate the current recommendation to the user's data, you can just return a generic context and mention that it might be a new avenue for the user to explore or that it is a popular recommendation that might interest the user or something similar to that.
+         - Do not use markdown in your responses, just return formatted plain text that is easy to read and understand.
         \n\n
         {context}
         """
@@ -109,6 +111,7 @@ DAILY_STORY_MODEL_PROMPT = """
      - Try as much as possible to use the user's data and past interactions to generate a story that is very specificalyy relatable to the user.
      - Every story should have at least one lesson or moral that the user can learn from the story which relates to the user's data or past interactions.
      - Stories should have at least 3 paragraphs and should be engaging and interesting to read. 
+     - Do not use markdown in your responses, just return fromatted plain text that is easy to read and understand.
 
     \n\n
     {context}

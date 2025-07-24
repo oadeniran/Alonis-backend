@@ -24,11 +24,13 @@ async def init_user_embeddings(user_data: str):
    # Build the context from user data
     context = {
        'context': {
-           'User Signup data': await asyncio.to_thread(serialize_dict_to_text, user_data, 2)
+           'User Signup data': {'content': await asyncio.to_thread(serialize_dict_to_text, user_data, 2),
+              'metadata': {
+                'source': 'user_signup',
+                'timestamp': datetime.now().isoformat(),
+              }
+           }
        },
-       'metadata': {
-           'source': 'user_signup'
-       }
     }
 
     # Create doc from context
@@ -69,7 +71,7 @@ async def generate_alonis_recommendations(user_id: str):
     Generate personalized Alonis recommendations for a user.
     """
 
-    if confirm_to_add_more_alonis_recommendations(user_id, 'alonis_recommendation'):
+    if await asyncio.to_thread(confirm_to_add_more_alonis_recommendations, user_id, 'alonis_recommendation'):
         # Call the function to get Alonis recommendations
         recommendations = await get_alonis_recommendations(user_id)
 
@@ -90,7 +92,7 @@ async def generate_alonis_recommendations_movies(user_id: str):
     """
     Generate personalized Alonis movie recommendations for a user.
     """
-    if confirm_to_add_more_alonis_recommendations(user_id, 'alonis_recommendation_movies'):
+    if await asyncio.to_thread(confirm_to_add_more_alonis_recommendations, user_id, 'alonis_recommendation'):
         recommendations = await get_alonis_qloo_powered_recommendations(user_id, rec_type='alonis_recommendation_movies')
 
         if recommendations:
@@ -124,7 +126,7 @@ async def generate_alonis_recommendations_books(user_id: str):
     """
     Generate personalized Alonis book recommendations for a user.
     """
-    if confirm_to_add_more_alonis_recommendations(user_id, 'alonis_recommendation_books'):
+    if await asyncio.to_thread(confirm_to_add_more_alonis_recommendations, user_id, 'alonis_recommendation'):
         recommendations = await get_alonis_qloo_powered_recommendations(user_id, rec_type='alonis_recommendation_books')
 
         if recommendations:

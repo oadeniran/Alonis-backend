@@ -44,6 +44,30 @@ async def login_user(login_cred):
     else:
         return {"error": resp["message"]}
 
+async def hackathon_username_only_authentication(username: str, short_bio: str = ""):
+    if not username or username == "":
+        return {"error": "Username is required for authentication"}
+    
+    resp = userActions.hackathon_username_only_authentication(username, short_bio)
+    if resp["status_code"] == 200:
+        if resp.get('login_count', 0) <= 1:
+            # If login count is less than   , initialize user embeddings
+            asyncio.create_task(background_tasks.init_user_embeddings(resp.get("user_details", {})))
+        else:
+            # If login count is more than 1, just update the user embeddings
+            asyncio.create_task(background_tasks.run_sequenced_user_login_tasks(
+                uid=resp.get("uid", "default_user"),
+                username=username,
+                login_count=resp.get("login_count", 1)  # Default to 1 if not present
+            ))
+
+        if 'user_details' in resp:
+            resp.pop('user_details', None)  # Remove user_details from the response to avoid sending sensitive data
+        
+        return resp
+    else:
+        return {"error": resp["message"]}
+
 async def get_all_sessions(uid: str):
     if not uid or uid == "":
         return {"error": "Please sign up/login to continue"}

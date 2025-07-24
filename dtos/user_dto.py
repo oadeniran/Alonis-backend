@@ -14,3 +14,7 @@ class UserLoginDTO(BaseModel):
     password: str
     email: Optional[str] = None  # Optional email field for login
     is_email_login: bool = False
+
+class HackathonAuthDTO(BaseModel):
+    username: str
+    short_bio: Optional[str] = ""  # Optional short bio for hackathon authentication

@@ -93,7 +93,8 @@ async def asessment_result_logic(assessment_data_for_prediction: AssessmenPredic
     userActions.add_report_to_db(user_id,test_option, session_id, report)
 
     asyncio.create_task(background_tasks.update_user_embeddings(
-        {"data_extracted": data_extracted, "prediction": prediction},
+        {"data_extracted": data_extracted, "prediction": prediction, 
+         "report": report},
         user_id,
         meta_data={"assessment_date": datetime.now().isoformat(), "assessment_type": test_option},
         session_id=session_id,
