@@ -620,6 +620,18 @@ def get_current_alonis_recommendations(uid, rec_type='alonis_recommendation', pa
     except Exception as e:
         print(f"Error fetching recommendations: {e}")
         return 
+    
+def confirm_user_has_performed_enough_actions(uid):
+    user_data = usersCollection.find_one({"_id": ObjectId(uid)})
+    if user_data:
+        has_report = reportsCollection.count_documents({"uid": uid}) > 0
+        has_note = usersCollection.find_one({"_id": ObjectId(uid), "note_count": {"$gt": 0}}) is not None
+        has_session_with_messages = sessionsCollection.count_documents({"uid": uid, 'session_type' : 'talk_session', "message_count": {"$gt": 6}}) > 0
+        
+        if has_report or has_note or has_session_with_messages:
+            return True
+    
+    return False
             
 def confirm_to_add_more_alonis_recommendations(uid, rec_type='alonis_recommendation'):
     try:
@@ -647,20 +659,11 @@ def confirm_to_add_more_alonis_recommendations(uid, rec_type='alonis_recommendat
             if total_with_actions > 0 and (count_with_true_actions / total_with_actions) > 0.6:
                 return True
         else:
-            # No recommendations found, so we can add more depending on
-            # Add user logic to determine if more recommendations should be added
-            # If user has at least one report or note or talk session with more than 6 messages, we can add more recommendations
-            user_data = usersCollection.find_one({"_id": ObjectId(uid)})
-            if user_data:
-                has_report = reportsCollection.count_documents({"uid": uid}) > 0
-                has_note = usersCollection.find_one({"_id": ObjectId(uid), "note_count": {"$gt": 0}}) is not None
-                has_session_with_messages = sessionsCollection.count_documents({"uid": uid, 'session_type' : 'talk_session', "message_count": {"$gt": 6}}) > 0
-                
-                if has_report or has_note or has_session_with_messages:
-                    return True
+            if rec_type == 'alonis_recommendation':
+                # If no recommendations exist, but is alonis_recommendations type then we can generate some
+                return True
 
-
-        return False
+            return confirm_user_has_performed_enough_actions(uid)
 
     except Exception as e:
         print(f"Error confirming recommendations: {e}")

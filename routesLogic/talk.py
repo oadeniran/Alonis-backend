@@ -68,6 +68,10 @@ async def get_daily_story(uid: str):
         user_story.pop('_id', None)  # Remove MongoDB ObjectId if present
         return  user_story
     
+    # confirm we can add stories for user based on data
+    if not userActions.confirm_user_has_performed_enough_actions(uid):
+        return {"story": ""}
+    
     # If no story for today, generate a new one
     previous_stories = userActions.get_previous_stories(uid)
     if previous_stories.get('count', 0) > 0:

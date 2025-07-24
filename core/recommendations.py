@@ -19,16 +19,18 @@ async def get_alonis_recommendations(user_id, limit=10):
     else:
         recommendation_context = "No previous recommendations found."
 
-    model = rag.load_model(retriever, [], flow = {
-        'name': 'recommendation_flow', 
-        'context' : f""" The current recommendations seen by user are: 
-            {recommendation_context}
-        """
-    })
+    model = await asyncio.to_thread(
+        lambda: rag.load_model(retriever, [], flow={
+            'name': 'recommendation_flow', 
+            'context': f"""The current recommendations seen by user are: 
+                {recommendation_context}
+            """
+        })
+    )
 
     recommendation_text  = model.invoke({"input": "Generate personalized recommendations based on the user's data and interactions."}).get("answer", "")
 
-    new_recommendations = extract_list_from_string(recommendation_text)
+    new_recommendations = await asyncio.to_thread(extract_list_from_string, recommendation_text)
 
     if isinstance(new_recommendations[0], list):
         return new_recommendations[0]
@@ -48,7 +50,7 @@ async def get_alonis_qloo_powered_recommendations(user_id, rec_type='alonis_reco
     recommendations = None
     
     # Get current page for Qloo recommendations for user
-    current_page = get_user_page_for_qloo_recommendations(user_id, rec_type)
+    current_page = await asyncio.to_thread(get_user_page_for_qloo_recommendations,user_id)
     
     # Step is get all possible tags for movies and tv shows
     # Build Model to return list of tags to use based on user data
@@ -62,13 +64,15 @@ async def get_alonis_qloo_powered_recommendations(user_id, rec_type='alonis_reco
 
     for rec_type in recommendations_to_get:
         # 1st get tags for movies and tv shows
-        tags = qloo_core.get_qloo_tags_to_select_from(rec_type.replace('alonis_recommendation_', ''))
+        tags = await asyncio.to_thread(qloo_core.get_qloo_tags_to_select_from, rec_type.replace('alonis_recommendation_', ''))
         # 2nd Load the model to get tags based on user data
         retriever = await rag.load_user_retriever(user_id)
-        model = rag.load_model(retriever, [], flow = {
+        model = await asyncio.to_thread(rag.load_model, retriever, [], flow = {
             'name': 'tag_selection_flow', 
-            'context' : f""" The current tags for {rec_type.replace('alonis_recommendation_', '')} are
+            'context' : f""" The current tags that can be selected for {rec_type.replace('alonis_recommendation_', '')} are
                 {dict_to_string(tags)}
+
+            The recommendation tags including number of times that have been shown to user are {dict_to_string(current_page.get(rec_type, {})) if rec_type in current_page else "No previous tags shown to user."}
             """
         })
         selected_tags_str = model.invoke({"input": "Select the tags that are appropriate for the user based on their data and past interactions."}).get("answer", "")
@@ -101,7 +105,7 @@ async def get_alonis_qloo_powered_recommendations(user_id, rec_type='alonis_reco
         page_to_use = current_page.get(rec_type, {})
         
         # 3rd get recommendations from Qloo API based on selected tags and current page
-        recommendations = qloo_core.get_qloo_recommendations(rec_type.replace('alonis_recommendation_', ''), final_tags, page=page_to_use)
+        recommendations = await asyncio.to_thread(qloo_core.get_qloo_recommendations, rec_type.replace('alonis_recommendation_', ''), final_tags, page=page_to_use)
 
         # Get the model to generate context for the recommendations
         # for rec in recommendations:

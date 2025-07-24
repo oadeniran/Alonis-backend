@@ -22,3 +22,17 @@ async def chroma_guard(uid: str, timeout: float = 360.0):
     finally:
         if lock.locked():
             lock.release()
+
+@asynccontextmanager
+async def zip_file_upload_guard(uid: str, timeout: float = 360.0):
+    """
+    Async-context that acquires the per-user lock for zip file uploads.
+    If lock isn't free within `timeout` seconds → raises asyncio.TimeoutError.
+    """
+    lock = get_user_lock(f"{uid}_zip_upload")
+    try:
+        await asyncio.wait_for(lock.acquire(), timeout=timeout)
+        yield
+    finally:
+        if lock.locked():
+            lock.release()

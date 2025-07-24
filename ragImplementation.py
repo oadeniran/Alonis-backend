@@ -16,7 +16,7 @@ from utils import upload_file_bytes, download_file_bytes
 from pathlib import Path
 import shutil
 import zipfile
-from locks import chroma_guard
+from locks import chroma_guard, zip_file_upload_guard
 import asyncio
 import model_prompts
 
@@ -66,14 +66,15 @@ async def upload_embeddings_to_azure(user_id: str):
         return "No embeddings created, user folder does not exist."
 
     # Zip the folder
-    shutil.make_archive(str(zip_path).replace(".zip", ""), 'zip', user_folder)
+    async with zip_file_upload_guard(user_id):
+        await asyncio.to_thread(shutil.make_archive, str(zip_path).replace(".zip", ""), 'zip', user_folder)
 
-    # Read and upload
-    file_bytes = zip_path.read_bytes()
-    upload_file_bytes(zip_path.name, file_bytes)
+        # Read and upload
+        file_bytes = zip_path.read_bytes()
+        await asyncio.to_thread(upload_file_bytes, zip_path.name, file_bytes)
 
-    # Clean up the zip file
-    zip_path.unlink()
+        # Clean up the zip file
+        zip_path.unlink()
     return "done"
 
 def download_and_restore_user_embeddings(user_id: str):

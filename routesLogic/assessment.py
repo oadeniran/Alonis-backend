@@ -41,9 +41,9 @@ async def assessment_logic(assessment_details: AssessmentDTO):
             }
 
     # Initialize session state if not already set
-    userActions.add_user_session(user_id, session_id, "assessment_"+test_option,test_config)
+    await asyncio.to_thread(userActions.add_user_session, user_id, session_id, "assessment_"+test_option,test_config)
 
-    output = chatbot.MindWavebot(uid = user_id, session_id = session_id, message = user_input, system_template=sys_template)
+    output = await asyncio.to_thread(chatbot.MindWavebot, uid = user_id, session_id = session_id, message = user_input, system_template=sys_template)
 
     asyncio.create_task(background_tasks.update_user_embeddings(
         {"user_input": user_input, "response": output},
@@ -81,16 +81,16 @@ async def asessment_result_logic(assessment_data_for_prediction: AssessmenPredic
     
 
     df_d = utils.convert_dict_to_df(data_extracted)
-    prediction = utils.get_prediction(test_option, df_d)
+    prediction = await asyncio.to_thread(utils.get_prediction,test_option, df_d)
     print("prediction===", prediction)
 
     # Get the previous report if it exists
-    previous_report = userActions.get_last_report_for_assessment_type(user_id, test_option)
+    previous_report = await asyncio.to_thread(userActions.get_last_report_for_assessment_type,user_id, test_option)
 
     data_extracted_str = utils.dict_to_string(data_extracted)
 
-    report = chatbot.MindwaveReportBot(uid = user_id, session_id = session_id, prediction = prediction, required_info = input_info, curr_test=test_option, data_extracted=data_extracted_str, previous_report=previous_report)
-    userActions.add_report_to_db(user_id,test_option, session_id, report)
+    report = await asyncio.to_thread(chatbot.MindwaveReportBot,uid = user_id, session_id = session_id, prediction = prediction, required_info = input_info, curr_test=test_option, data_extracted=data_extracted_str, previous_report=previous_report)
+    await asyncio.to_thread(userActions.add_report_to_db, user_id,test_option, session_id, report)
 
     asyncio.create_task(background_tasks.update_user_embeddings(
         {"data_extracted": data_extracted, "prediction": prediction, 
