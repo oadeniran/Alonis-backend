@@ -15,7 +15,12 @@ QLOO_HEADER = {
 }
 
 def get_qloo_rec_endpoint(entity, tags, page):
-    return f"{QLOO_API_URL}v2/insights?filter.type={entity}&filter.tags={tags}&page={page}"
+    year_limit = ""
+    if entity in ["movies", "tv_shows"]:
+        year_limit = "&filter.release_year.min=2000"
+    elif entity == "books":
+        year_limit = "&filter.publication_year.min=2000"
+    return f"{QLOO_API_URL}v2/insights?filter.type={entity}&filter.tags={tags}&page={page}{year_limit}"
 
 def get_qloo_tags_endpoint(entity):
     return f"{QLOO_API_URL}v2/tags?feature.typo_tolerance=false&filter.parents.types={entity}"

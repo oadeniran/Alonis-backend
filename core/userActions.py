@@ -625,7 +625,7 @@ def confirm_user_has_performed_enough_actions(uid):
     user_data = usersCollection.find_one({"_id": ObjectId(uid)})
     if user_data:
         has_report = reportsCollection.count_documents({"uid": uid}) > 0
-        has_note = usersCollection.find_one({"_id": ObjectId(uid), "note_count": {"$gt": 0}}) is not None
+        has_note = usersCollection.find_one({"_id": ObjectId(uid), "note_count": {"$gt": 2}}) is not None
         has_session_with_messages = sessionsCollection.count_documents({"uid": uid, 'session_type' : 'talk_session', "message_count": {"$gt": 6}}) > 0
         
         if has_report or has_note or has_session_with_messages:
