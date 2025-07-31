@@ -67,7 +67,9 @@ async def upload_embeddings_to_azure(user_id: str):
 
     # Zip the folder
     async with zip_file_upload_guard(user_id):
+        print(f"Zipping folder: {user_folder} to {zip_path}")
         await asyncio.to_thread(shutil.make_archive, str(zip_path).replace(".zip", ""), 'zip', user_folder)
+        print(f"Zipped folder to {zip_path}")
 
         # Read and upload
         file_bytes = zip_path.read_bytes()
