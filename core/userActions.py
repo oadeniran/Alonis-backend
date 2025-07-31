@@ -372,8 +372,6 @@ def add_note_or_goal_for_user(uid, note_details):
             {"_id": ObjectId(uid)},
             {"$inc": {"note_count": 1}}
         )
-
-    print(resp)
     
     if resp["status_code"] != 200:
         return {"error": resp["message"], "status_code": resp["status_code"]}

@@ -69,7 +69,6 @@ async def upload_embeddings_to_azure(user_id: str):
     async with zip_file_upload_guard(user_id):
         print(f"Zipping folder: {user_folder} to {zip_path}")
         await asyncio.to_thread(shutil.make_archive, str(zip_path).replace(".zip", ""), 'zip', user_folder)
-        print(f"Zipped folder to {zip_path}")
 
         # Read and upload
         file_bytes = zip_path.read_bytes()
@@ -137,6 +136,7 @@ async def create_embeddings_for_user(docs, user_id: str) -> str:
 async def update_embeddings_for_user(docs, user_id: str) -> str:
     """Append new docs to an existing user store (creates one if absent)."""
     if not os.path.exists(os.path.join(EMBEDDINGS_DIR, user_id)):
+        print(f"No embeddings found for user {user_id}, creating a new store.")
         # No store yet → Try loading from azure Blob Storage and if still not there then build context from user data
         try:
             async with chroma_guard(user_id):
@@ -176,10 +176,12 @@ async def load_user_retriever(user_id: str):
     """
     if not os.path.exists(os.path.join(EMBEDDINGS_DIR, user_id)):
         # No store yet → Try loading from azure Blob Storage and if still not there then build context from user data
+        print(f"No embeddings found for user when trying to load retriever {user_id}, creating a new store.")
         try:
             async with chroma_guard(user_id):
+                async with zip_file_upload_guard(user_id):
                 # Attempt to download and restore user embeddings
-                res = download_and_restore_user_embeddings(user_id)
+                    res = download_and_restore_user_embeddings(user_id)
         except Exception as e:
             res = None # If the file doesn't exist, then just create an empty store
         if res is None:
