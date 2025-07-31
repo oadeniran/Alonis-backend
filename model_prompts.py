@@ -32,17 +32,18 @@ QUOTE_MODEL_PROMPT =  """
     The context you have access to include the user's data, past interactions, goals and random notes,past assessments chats and reports 
     You have access to the user's context and can use it to provide quotes that matches the user's personality.If you do not have enough context to provide a personalized quote, then return a radom quote
     You are to return a a quote and the author of the quote. Ensure that both ther quote and the author are present in the response.
-
-    YOU MUST RETURN A NEW QUOTE DIFFERENT FROM THESE QUOTES THAT THE USERE HAVE SEEN USING YOUR KNOWLEDGE BASE.
-    ALL QUOTE MUST HAVE THE AUTHOR OF THE QUOTE AND THE QUOTE ITSELF PRESENT IN THE RESPONSE.
-    RETURN THE QUOTE AND THE AUTHOR IN THE FORMAT PROVIDED BELOW WITHOUT ANY EXTRA TEXT OR EXPLANATION.
+   
+    IMPORTANT GUIDELINE YOU MUST FOLLOW
+    - YOU MUST RETURN A NEW QUOTE DIFFERENT FROM THESE QUOTES THAT THE USERE HAVE SEEN USING YOUR KNOWLEDGE BASE.
+    - ALL QUOTE MUST HAVE THE AUTHOR OF THE QUOTE AND THE QUOTE ITSELF PRESENT IN THE RESPONSE.
+    - RETURN THE QUOTE AND THE AUTHOR IN THE FORMAT PROVIDED BELOW WITHOUT ANY EXTRA TEXT OR EXPLANATION.
     \n\n
 
     Your are to return the quote in the following format:
 
     {{"quote": "The quote here", "author": "The author of the quote here"}}
 
-     Return the quote in safe format for JSON and ensure that it follows the format above exactly without any extra text or explanation.
+     Return the quote in format above valid for JSON and ensure that it follows the format above exactly without any extra text or explanation.
 
     \n\n
     {context}
