@@ -76,7 +76,7 @@ async def upload_embeddings_to_azure(user_id: str):
 
         # Clean up the zip file
         zip_path.unlink()
-    return "done"
+        return "done"
 
 def download_and_restore_user_embeddings(user_id: str):
     """
