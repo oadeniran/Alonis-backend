@@ -1,8 +1,10 @@
 from fastapi import APIRouter
 from routesLogic import userActions
-router = APIRouter()
-from dtos.user_dto import UserDTO, UserLoginDTO
+from typing import Literal
+from dtos.user_dto import UserDTO, UserLoginDTO, HackathonAuthDTO
+from dtos.notes_dto import Note_AND_GOAL
 
+router = APIRouter()
 @router.post("/sign-up")
 async def sign_up(user_details: UserDTO):
     """
@@ -14,7 +16,7 @@ async def sign_up(user_details: UserDTO):
     Returns:
         dict: A dictionary containing a success message or an error message.
     """
-    return userActions.signup_user(user_details.model_dump())
+    return await userActions.signup_user(user_details.model_dump())
 
 @router.post("/sign-in")
 async def sign_in(login_cred: UserLoginDTO):
@@ -28,10 +30,26 @@ async def sign_in(login_cred: UserLoginDTO):
     Returns:
         dict: A dictionary containing a success message or an error message.
     """
-    return userActions.login_user(login_cred.model_dump())
+    return await userActions.login_user(login_cred.model_dump())
 
-@router.get("/get-all-sessions")
-async def get_all_sessions(uid: str):
+@router.post("/hackathon-username-only-auth")
+async def hackathon_username_only_auth(hackathon_auth_data: HackathonAuthDTO):
+    """
+    Endpoint for hackathon username-only authentication.
+    
+    Args:
+        username (str): Username of the user.
+        short_bio (str): Short bio of the user (optional).
+    
+    Returns:
+        dict: A dictionary containing a success message or an error message.
+    """
+    username = hackathon_auth_data.username
+    short_bio = hackathon_auth_data.short_bio or ""
+    return await userActions.hackathon_username_only_authentication(username, short_bio)
+
+@router.get("/{uid}/sessions")
+async def get_user_sessions(uid: str):
     """
     Endpoint to retrieve all user sessions.
     
@@ -43,30 +61,149 @@ async def get_all_sessions(uid: str):
     """
     return await userActions.get_all_sessions(uid)
 
-@router.get("/get-session-chats")
-async def get_session_chats(uid: str, session_id: str, rant: bool = False):
+@router.get("/{uid}/{session_id}/session-chats")
+async def get_user_session_chats(uid: str, session_id: str, is_talk_session: bool = False):
     """
     Endpoint to retrieve chats for a specific user session.
     
     Args:
         uid (str): User ID.
         session_id (str): Session ID.
-        rant (bool): Flag to indicate if the session is a rant session.
+        is_talk_session (bool): Flag to indicate if the session is a talk session.
     
     Returns:
         dict: A dictionary containing the chats for the session or an error message.
     """
-    return await userActions.get_session_chats(uid, session_id, rant)
+    return await userActions.get_user_session_chats(uid, session_id, is_talk_session)
 
-@router.get("/get-user-reports")
-async def get_user_reports(uid: str):
+@router.get("/{uid}/{session_id}/session-report")
+async def get_user_session_report(uid: str, session_id: str):
     """
-    Endpoint to retrieve all reports for a user.
+    Endpoint to retrieve user session report.
+    
+    Args:
+        uid (str): User ID.
+        session_id (str): Session ID.
+    
+    Returns:
+        dict: The session report data or an error message.
+    """
+    return await userActions.get_user_session_report(uid, session_id)
+
+@router.post('/add-note-or-goal')
+async def add_note_or_goal(note_details: Note_AND_GOAL):
+    """
+    Endpoint to add a note or goal for a user.
+    
+    Args:
+        note_details (Note_AND_GOAL): Details of the note or goal to be added.
+    
+    Returns:
+        dict: A dictionary containing a success message or an error message.
+    """
+    return await userActions.add_user_note_or_goal(note_details.uid, note_details.model_dump())
+
+@router.get("/{uid}/get-notes-and-goals")
+async def get_user_notes_and_goals(uid: str, page: int = 1):
+    """
+    Endpoint to retrieve paginated notes and goals for a user.
+    
+    Args:
+        uid (str): User ID.
+        page (int): Page number (default = 1).
+    
+    Returns:
+        dict: Notes and goals with pagination.
+    """
+    return await userActions.get_user_notes_and_goals(uid, page)
+
+@router.post("/{uid}/mark-goal-as-achieved/{note_id}")
+async def mark_goal_as_achieved(uid: str, note_id: str):
+    """
+    Endpoint to mark a note as achieved for a user.
+    
+    Args:
+        uid (str): User ID.
+        note_id (str): Note ID to be marked as achieved.
+    
+    Returns:
+        dict: A dictionary containing a success message or an error message.
+    """
+    return await userActions.mark_goal_as_achieved(uid, note_id)
+
+@router.delete("/{uid}/delete-note-or-goal/{note_id}")
+async def delete_note_or_goal(uid: str, note_id: str):
+    """
+    Endpoint to delete a note or goal for a user.
+    
+    Args:
+        uid (str): User ID.
+        note_id (str): Note or goal ID to be deleted.
+    
+    Returns:
+        dict: A dictionary containing a success message or an error message.
+    """
+    return await userActions.delete_note_or_goal(uid, note_id)
+
+@router.get("/{uid}/alonis-recommendations/{rec_type}")
+async def get_alonis_recommendations(
+    uid: str,
+    rec_type: Literal['alonis_recommendation', 'alonis_recommendation_movies', 'alonis_recommendation_songs', 
+                      'alonis_recommendation_books', 'alonis_recommendation_news'] = 'alonis_recommendation',
+    page: int = None
+):
+    """
+    Endpoint to retrieve personalized Alonis recommendations for a user.
+    
+    Args:
+        uid (str): User ID.
+        limit (int): Number of recommendations to retrieve.
+    
+    Returns:
+        dict: A dictionary containing the recommendations or an error message.
+    """
+    if not uid or uid == "":
+        return {"error": "Please sign up/login to continue"}
+    
+    return await userActions.get_alonis_recommendations(uid, rec_type, page)
+
+@router.post("/{uid}/mark-interaction-with-recommendation/{rec_id}")
+async def mark_interaction_with_recommendation(uid: str, rec_id: str):
+    """
+    Endpoint to mark an interaction with a recommendation for a user.
+    
+    Args:
+        uid (str): User ID.
+        rec_id (str): Recommendation ID to be marked.
+    
+    Returns:
+        dict: A dictionary containing a success message or an error message.
+    """
+    return await userActions.mark_interaction_with_recommendation(uid, rec_id)
+
+@router.post("/{uid}/mark-recommendation-as-completed/{rec_id}")
+async def mark_recommendation_as_completed(uid: str, rec_id: str):
+    """
+    Endpoint to mark a recommendation as completed for a user.
+    
+    Args:
+        uid (str): User ID.
+        rec_id (str): Recommendation ID to be marked as completed.
+    
+    Returns:
+        dict: A dictionary containing a success message or an error message.
+    """
+    return await userActions.mark_recommendation_as_completed(uid, rec_id)
+
+@router.get("/{uid}/initiate-user-recommendations")
+async def initiate_user_recommendations(uid: str):
+    """
+    Endpoint to initiate user recommendations for a user.
     
     Args:
         uid (str): User ID.
     
     Returns:
-        dict: A dictionary containing all user reports or an error message.
+        dict: A dictionary containing a success message or an error message.
     """
-    return await userActions.get_user_reports(uid)
+    return await userActions.initiate_user_recommendations(uid)

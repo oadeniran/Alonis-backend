@@ -1,11 +1,10 @@
 from fastapi import APIRouter
 from dtos.assessment_dto import AssessmentDTO, AssessmenPredictionDTO
 from routesLogic import assessment
-import uuid
 
 router = APIRouter()
 
-@router.post("/assessment")
+@router.post("/assessment-chat")
 async def assessment_route(assessment_details: AssessmentDTO):
     """
     Endpoint to handle assessment requests.
@@ -30,13 +29,3 @@ async def assessment_result_route(assessment_data_for_prediction: AssessmenPredi
         dict: A dictionary containing the response message or extracted data.
     """
     return await assessment.asessment_result_logic(assessment_data_for_prediction)
-
-@router.get("/generate-session-id")
-async def generate_session_id():
-    """
-    Endpoint to generate a new session ID.
-    
-    Returns:
-        dict: A dictionary containing the generated session ID.
-    """
-    return {"session_id": str(uuid.uuid4())}

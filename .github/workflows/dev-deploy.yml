@@ -53,6 +53,6 @@ jobs:
         - name: Deploy to web app
           uses: azure/webapps-deploy@v2
           with:
-            app-name: 'alonis-backend'
+            app-name: 'alonis'
             package: '.'
             images: 'ghcr.io/${{ needs.Containerize-job.outputs.repo_owner_lower }}/alonis-be:v1-${{ github.sha }}'
