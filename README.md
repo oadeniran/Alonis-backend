@@ -11,6 +11,39 @@
 
 Alonis is a comprehensive mental health and personality assessment platform that provides AI-powered therapeutic conversations, assessments, and personalized recommendations. The backend is built with FastAPI and uses MongoDB for data storage, with advanced RAG (Retrieval-Augmented Generation) capabilities for personalized responses.
 
+## Table of contents
+- [Overview](#overview)
+- [Project Architecture](#project-architecture)
+    - [Directory Structure](#directory-structure)
+- [Data Flow Architecture](#data-flow-architecture)
+    - [Routes → Routes Logic → Core Implementation](#1-routes--routes-logic--core-implementation)
+    - [Request Flow Examples](#2-request-flow-examples)
+- [Core Modules Functionality](#core-modules-functionality)
+- [Recommendation System Architecture](#recommendation-system-architecture)
+    - [System Overview](#system-overview)
+    - [Recommendation Types](#recommendation-types)
+    - [Generation Process](#generation-process)
+    - [AI Integration Points](#ai-integration-points)
+    - [User Interaction Tracking](#user-interaction-tracking)
+    - [Technical Implementation](#technical-implementation)
+- [Key Features](#key-features)
+- [AI and ML Components](#ai-and-ml-components)
+- [Database Schema](#database-schema)
+- [Environment Configuration](#environment-configuration)
+- [Background Services](#background-services)
+- [Security Features](#security-features)
+- [Getting Started](#getting-started)
+    - [Prerequisites](#prerequisites)
+    - [Installation](#installation)
+    - [API Documentation](#api-documentation)
+- [API Endpoints Overview](#api-endpoints-overview)
+    - [Assessment Endpoints](#assessment-endpoints-assessment)
+    - [Talk Session Endpoints](#talk-session-endpoints-talk)
+    - [User Management Endpoints](#user-management-endpoints-user)
+    - [Recommendation Endpoints](#recommendation-endpoints-useruid)
+- [Contributing](#contributing)
+- [Technology Stack](#technology-stack)
+
 ## Project Architecture
 
 ### Directory Structure
