@@ -92,7 +92,7 @@ async def generate_alonis_recommendations_movies(user_id: str):
     """
     Generate personalized Alonis movie recommendations for a user.
     """
-    if await asyncio.to_thread(confirm_to_add_more_alonis_recommendations, user_id, 'alonis_recommendation'):
+    if await asyncio.to_thread(confirm_to_add_more_alonis_recommendations, user_id, 'alonis_recommendation_movies'):
         recommendations = await get_alonis_qloo_powered_recommendations(user_id, rec_type='alonis_recommendation_movies')
 
         if recommendations:
@@ -126,7 +126,7 @@ async def generate_alonis_recommendations_books(user_id: str):
     """
     Generate personalized Alonis book recommendations for a user.
     """
-    if await asyncio.to_thread(confirm_to_add_more_alonis_recommendations, user_id, 'alonis_recommendation'):
+    if await asyncio.to_thread(confirm_to_add_more_alonis_recommendations, user_id, 'alonis_recommendation_books'):
         recommendations = await get_alonis_qloo_powered_recommendations(user_id, rec_type='alonis_recommendation_books')
 
         if recommendations:

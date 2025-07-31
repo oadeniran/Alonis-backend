@@ -126,7 +126,7 @@ async def create_embeddings_for_user(docs, user_id: str) -> str:
             persist_directory=os.path.join(EMBEDDINGS_DIR, user_id),
             embedding=EMBEDDING
         )
-    print(f"Created embeddings for user {user_id} with {len(splits)} documents.")
+    print(f"Created embeddings for user {user_id} with {len(splits)} documents. in {os.path.join(EMBEDDINGS_DIR, user_id)}")
 
     # Upload the embeddings to Azure Blob Storage for backup and loading
     asyncio.create_task(upload_embeddings_to_azure(user_id))
