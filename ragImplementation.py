@@ -141,6 +141,7 @@ async def update_embeddings_for_user(docs, user_id: str) -> str:
         try:
             async with chroma_guard(user_id):
                 # Attempt to download and restore user embeddings
+                print(f"Attempting to download and restore user embeddings for {user_id}")
                 res = download_and_restore_user_embeddings(user_id)
         except Exception as e:
             print(f"Error restoring user embeddings for {user_id}: {e}")
